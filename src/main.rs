@@ -1,11 +1,18 @@
+mod settings_window;
+mod settings;
+
 use std::{
-    collections::HashMap, fmt::Display, time::{Duration, Instant}
+    collections::HashMap,
+    fmt::Display,
+    time::{Duration, Instant},
 };
 
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use log::{debug, trace};
 use reqwest;
 use serde::Deserialize;
+use settings::Settings;
+use settings_window::show_settings_window;
 use tokio::time::sleep;
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuItem},
@@ -147,6 +154,7 @@ impl CurrentWeather {
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum MenuMessage {
     Update,
+    Config,
     Exit,
 }
 
@@ -159,13 +167,16 @@ impl WeatherTrayIcon {
     fn new() -> Result<Self> {
         debug!("Building tray menu");
         let menu = Menu::new();
-        let item_update = MenuItem::new("Update", true, None);
+        let item_update = MenuItem::new("Aktualisieren", true, None);
+        let item_config = MenuItem::new("Konfigurieren", true, None);
         let item_exit = MenuItem::new("Beenden", true, None);
         menu.append(&item_update)?;
+        menu.append(&item_config)?;
         menu.append(&item_exit)?;
 
         let mut menu_items = HashMap::new();
         menu_items.insert(MenuMessage::Update, item_update);
+        menu_items.insert(MenuMessage::Config, item_config);
         menu_items.insert(MenuMessage::Exit, item_exit);
 
         Ok(WeatherTrayIcon {
@@ -189,7 +200,8 @@ impl WeatherTrayIcon {
     fn set_error(&self, msg: &str) -> Result<()> {
         debug!("Set error: {}", msg);
         self.tray_icon.set_tooltip(Some(msg))?;
-        self.tray_icon.set_icon(Icon::from_resource_name("exclamation-circle", None).ok())?;
+        self.tray_icon
+            .set_icon(Icon::from_resource_name("exclamation-circle", None).ok())?;
         Ok(())
     }
 }
@@ -207,6 +219,7 @@ impl WeatherApp {
             tray_icon,
         })
     }
+
     async fn update_weather(&self) -> Result<()> {
         debug!("update_weather()");
         let weather = self.get_weather().await;
@@ -216,6 +229,7 @@ impl WeatherApp {
         };
         Ok(())
     }
+
     async fn get_weather(&self) -> Result<CurrentWeather> {
         debug!("get_weather()");
         let url = format!(
@@ -227,15 +241,28 @@ impl WeatherApp {
     }
 }
 
+
 const UPDATE_INTERVAL: u64 = 60 * 15;
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     env_logger::init();
+
+    let mut settings = Settings::default();
+    if settings.exists() {
+        settings.load();
+    } else {
+        let new_settings = show_settings_window(&settings);
+        if new_settings.is_none() {
+            return;
+        }
+        settings = new_settings.unwrap();
+        settings.save();
+    }
 
     // Wolfsburg Ehmen
     let location = (52.397120, 10.700460);
-    let app = WeatherApp::new(location)?;
+    let app = WeatherApp::new(location).unwrap();
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
@@ -243,24 +270,20 @@ async fn main() -> Result<()> {
     let mut last = Instant::now() - Duration::from_secs(UPDATE_INTERVAL);
 
     event_loop.block_on(async move {
-        let update_menu_id = app
-            .tray_icon
-            .menu_items
-            .get(&MenuMessage::Update)
-            .unwrap()
-            .id();
-        let exit_menu_id = app
-            .tray_icon
-            .menu_items
-            .get(&MenuMessage::Exit)
-            .unwrap()
-            .id();
+        let menu_items = &app.tray_icon.menu_items;
+        let update_menu_id = menu_items.get(&MenuMessage::Update).unwrap().id();
+        let config_menu_id = menu_items.get(&MenuMessage::Config).unwrap().id();
+        let exit_menu_id = menu_items.get(&MenuMessage::Exit).unwrap().id();
         loop {
             trace!("loop");
             if let Ok(event) = MenuEvent::receiver().try_recv() {
                 debug!("Menu event: {:?}", event);
                 if event.id() == update_menu_id {
                     app.update_weather().await.unwrap();
+                } else if event.id() == config_menu_id {
+                    if let Some(settings) = show_settings_window(&settings) {
+                        settings.save();
+                    }
                 } else if event.id() == exit_menu_id {
                     window_target.exit().await;
                 }
@@ -270,5 +293,5 @@ async fn main() -> Result<()> {
             }
             sleep(Duration::from_millis(1000)).await;
         }
-    })
+    });
 }
