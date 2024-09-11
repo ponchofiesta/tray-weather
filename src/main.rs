@@ -1,23 +1,20 @@
+mod gui;
 mod settings;
-mod settings_window;
+mod weather;
 
 use std::{
-    collections::HashMap,
     fmt::Display,
     time::{Duration, Instant},
 };
 
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
+use gui::{show_settings_window, MenuMessage, WeatherTrayIcon};
 use log::{debug, trace};
 use reqwest;
-use serde::Deserialize;
 use settings::Settings;
-use settings_window::show_settings_window;
 use tokio::time::sleep;
-use tray_icon::{
-    menu::{Menu, MenuEvent, MenuItem},
-    Icon, TrayIcon, TrayIconBuilder,
-};
+use tray_icon::menu::MenuEvent;
+use weather::{CurrentWeather, WeatherResponse};
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -70,141 +67,6 @@ impl From<tray_icon::menu::Error> for Error {
     }
 }
 
-#[derive(Deserialize, Debug)]
-struct WeatherResponse {
-    current_weather: CurrentWeather,
-}
-
-#[derive(Deserialize, Debug)]
-struct CurrentWeather {
-    temperature: f64,
-    weathercode: i32,
-}
-
-impl CurrentWeather {
-    fn description(&self) -> &str {
-        match self.weathercode {
-            0 => "Klarer Himmel",
-            1 => "Überwiegend klar",
-            2 => "Teilweise bewölkt",
-            3 => "Bewölkt",
-            45 => "Nebel",
-            48 => "Reif-Nebel",
-            51 => "Leichter Nieselregen",
-            53 => "Mäßiger Nieselregen",
-            55 => "Starker Nieselregen",
-            56 => "Leichter gefrierender Nieselregen",
-            57 => "Starker gefrierender Nieselregen",
-            61 => "Leichter Regen",
-            63 => "Mäßiger Regen",
-            65 => "Starker Regen",
-            66 => "Leichter gefrierender Regen",
-            67 => "Starker gefrierender Regen",
-            71 => "Leichter Schneefall",
-            73 => "Mäßiger Schneefall",
-            75 => "Starker Schneefall",
-            77 => "Schneekörner",
-            80 => "Leichte Regenschauer",
-            81 => "Mäßige Regenschauer",
-            82 => "Heftige Regenschauer",
-            85 => "Leichte Schneeschauer",
-            86 => "Starke Schneeschauer",
-            95 => "Gewitter",
-            96 => "Gewitter mit leichtem Hagel",
-            99 => "Gewitter mit starkem Hagel",
-            _ => "Unbekannte Wetterbedingungen",
-        }
-    }
-
-    fn icon_name(&self) -> &str {
-        match self.weathercode {
-            0 => "clearsky_day",
-            1 => "fair_day",
-            2 => "partlycloudy_day",
-            3 => "cloudy",
-            45 => "fog",
-            48 => "fog",
-            51 => "lightrain",
-            53 => "lightrain",
-            55 => "lightrain",
-            56 => "lightrain",
-            57 => "lightrain",
-            61 => "lightrain",
-            63 => "rain",
-            65 => "heavyrain",
-            66 => "lightrain",
-            67 => "heavyrain",
-            71 => "lightsnow",
-            73 => "snow",
-            75 => "heavysnow",
-            77 => "lightsnow",
-            80 => "lightrain",
-            81 => "rain",
-            82 => "heavyrain",
-            85 => "lightsleet",
-            86 => "heavysleet",
-            95 => "heavyrainandthunder",
-            96 => "sleetandthunder",
-            99 => "heavysleetandthunder",
-            _ => "exclamation-circle",
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-enum MenuMessage {
-    Update,
-    Config,
-    Exit,
-}
-
-struct WeatherTrayIcon {
-    tray_icon: TrayIcon,
-    menu_items: HashMap<MenuMessage, MenuItem>,
-}
-
-impl WeatherTrayIcon {
-    fn new() -> Result<Self> {
-        debug!("Building tray menu");
-        let menu = Menu::new();
-        let item_update = MenuItem::new("Aktualisieren", true, None);
-        let item_config = MenuItem::new("Konfigurieren", true, None);
-        let item_exit = MenuItem::new("Beenden", true, None);
-        menu.append(&item_update)?;
-        menu.append(&item_config)?;
-        menu.append(&item_exit)?;
-
-        let mut menu_items = HashMap::new();
-        menu_items.insert(MenuMessage::Update, item_update);
-        menu_items.insert(MenuMessage::Config, item_config);
-        menu_items.insert(MenuMessage::Exit, item_exit);
-
-        Ok(WeatherTrayIcon {
-            tray_icon: TrayIconBuilder::new().with_menu(Box::new(menu)).build()?,
-            menu_items,
-        })
-    }
-
-    fn set_weather(&self, weather: &CurrentWeather) -> Result<()> {
-        debug!("Set weather: {:?}", &weather);
-        self.tray_icon
-            .set_icon(Icon::from_resource_name(weather.icon_name(), None).ok())?;
-        self.tray_icon.set_tooltip(Some(format!(
-            "{} - {}",
-            weather.temperature,
-            weather.description()
-        )))?;
-        Ok(())
-    }
-
-    fn set_error(&self, msg: &str) -> Result<()> {
-        debug!("Set error: {}", msg);
-        self.tray_icon.set_tooltip(Some(msg))?;
-        self.tray_icon
-            .set_icon(Icon::from_resource_name("exclamation-circle", None).ok())?;
-        Ok(())
-    }
-}
 
 struct WeatherApp {
     settings: Settings,

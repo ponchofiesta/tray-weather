@@ -1,8 +1,67 @@
-use std::sync::mpsc::{channel, Sender};
+use std::{collections::HashMap, sync::mpsc::{channel, Sender}};
 
 use eframe::egui::{self, TextEdit};
+use log::debug;
+use tray_icon::{menu::{Menu, MenuItem}, Icon, TrayIcon, TrayIconBuilder};
 
-use crate::Settings;
+use crate::{weather::CurrentWeather, Settings, Result};
+
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub(crate) enum MenuMessage {
+    Update,
+    Config,
+    Exit,
+}
+
+pub(crate) struct WeatherTrayIcon {
+    pub tray_icon: TrayIcon,
+    pub menu_items: HashMap<MenuMessage, MenuItem>,
+}
+
+impl WeatherTrayIcon {
+    pub fn new() -> Result<Self> {
+        debug!("Building tray menu");
+        let menu = Menu::new();
+        let item_update = MenuItem::new("Aktualisieren", true, None);
+        let item_config = MenuItem::new("Konfigurieren", true, None);
+        let item_exit = MenuItem::new("Beenden", true, None);
+        menu.append(&item_update)?;
+        menu.append(&item_config)?;
+        menu.append(&item_exit)?;
+
+        let mut menu_items = HashMap::new();
+        menu_items.insert(MenuMessage::Update, item_update);
+        menu_items.insert(MenuMessage::Config, item_config);
+        menu_items.insert(MenuMessage::Exit, item_exit);
+
+        Ok(WeatherTrayIcon {
+            tray_icon: TrayIconBuilder::new().with_menu(Box::new(menu)).build()?,
+            menu_items,
+        })
+    }
+
+    pub fn set_weather(&self, weather: &CurrentWeather) -> Result<()> {
+        debug!("Set weather: {:?}", &weather);
+        self.tray_icon
+            .set_icon(Icon::from_resource_name(weather.icon_name(), None).ok())?;
+        self.tray_icon.set_tooltip(Some(format!(
+            "{} - {}",
+            weather.temperature,
+            weather.description()
+        )))?;
+        Ok(())
+    }
+
+    pub fn set_error(&self, msg: &str) -> Result<()> {
+        debug!("Set error: {}", msg);
+        self.tray_icon.set_tooltip(Some(msg))?;
+        self.tray_icon
+            .set_icon(Icon::from_resource_name("exclamation-circle", None).ok())?;
+        Ok(())
+    }
+}
+
 
 pub(crate) struct SettingsWindow<T> {
     tx: Option<Sender<T>>,
