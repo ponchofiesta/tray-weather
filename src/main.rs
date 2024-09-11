@@ -2,9 +2,7 @@ mod settings_window;
 mod settings;
 
 use std::{
-    collections::HashMap,
-    fmt::Display,
-    time::{Duration, Instant},
+    collections::HashMap, fmt::Display, process::exit, time::{Duration, Instant}
 };
 
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
@@ -267,7 +265,7 @@ async fn main() {
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
 
-    let mut last = Instant::now() - Duration::from_secs(UPDATE_INTERVAL);
+    let mut last = Instant::now().checked_sub(Duration::from_secs(UPDATE_INTERVAL)).unwrap();
 
     event_loop.block_on(async move {
         let menu_items = &app.tray_icon.menu_items;
