@@ -1,8 +1,10 @@
-mod settings_window;
 mod settings;
+mod settings_window;
 
 use std::{
-    collections::HashMap, fmt::Display, process::exit, time::{Duration, Instant}
+    collections::HashMap,
+    fmt::Display,
+    time::{Duration, Instant},
 };
 
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
@@ -205,15 +207,15 @@ impl WeatherTrayIcon {
 }
 
 struct WeatherApp {
-    location: (f32, f32),
+    settings: Settings,
     tray_icon: WeatherTrayIcon,
 }
 
 impl WeatherApp {
-    fn new(location: (f32, f32)) -> Result<Self> {
+    fn new(settings: Settings) -> Result<Self> {
         let tray_icon = WeatherTrayIcon::new()?;
         Ok(WeatherApp {
-            location,
+            settings,
             tray_icon,
         })
     }
@@ -232,13 +234,18 @@ impl WeatherApp {
         debug!("get_weather()");
         let url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current_weather=true",
-            self.location.0, self.location.1
+            self.settings.latitude, self.settings.longitude
         );
         let response = reqwest::get(&url).await?.json::<WeatherResponse>().await?;
         Ok(response.current_weather)
     }
-}
 
+    async fn update_settings(&mut self, settings: Settings) -> Result<()> {
+        self.settings = settings;
+        self.update_weather().await?;
+        Ok(())
+    }
+}
 
 const UPDATE_INTERVAL: u64 = 60 * 15;
 
@@ -259,37 +266,57 @@ async fn main() {
     }
 
     // Wolfsburg Ehmen
-    let location = (52.397120, 10.700460);
-    let app = WeatherApp::new(location).unwrap();
+    // let location = (52.397120, 10.700460);
+    let mut app = WeatherApp::new(settings.clone()).unwrap();
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
 
-    let mut last = Instant::now().checked_sub(Duration::from_secs(UPDATE_INTERVAL)).unwrap();
+    let mut last = Instant::now()
+        .checked_sub(Duration::from_secs(UPDATE_INTERVAL))
+        .unwrap();
 
     event_loop.block_on(async move {
-        let menu_items = &app.tray_icon.menu_items;
-        let update_menu_id = menu_items.get(&MenuMessage::Update).unwrap().id();
-        let config_menu_id = menu_items.get(&MenuMessage::Config).unwrap().id();
-        let exit_menu_id = menu_items.get(&MenuMessage::Exit).unwrap().id();
         loop {
             trace!("loop");
             if let Ok(event) = MenuEvent::receiver().try_recv() {
                 debug!("Menu event: {:?}", event);
-                if event.id() == update_menu_id {
+                if event.id()
+                    == app
+                        .tray_icon
+                        .menu_items
+                        .get(&MenuMessage::Update)
+                        .unwrap()
+                        .id()
+                {
                     app.update_weather().await.unwrap();
-                } else if event.id() == config_menu_id {
+                } else if event.id()
+                    == app
+                        .tray_icon
+                        .menu_items
+                        .get(&MenuMessage::Config)
+                        .unwrap()
+                        .id()
+                {
                     if let Some(settings) = show_settings_window(&settings) {
                         settings.save();
+                        app.update_settings(settings.clone()).await.unwrap();
                     }
-                } else if event.id() == exit_menu_id {
+                } else if event.id()
+                    == app
+                        .tray_icon
+                        .menu_items
+                        .get(&MenuMessage::Exit)
+                        .unwrap()
+                        .id()
+                {
                     window_target.exit().await;
                 }
             } else if last < Instant::now() - Duration::from_secs(UPDATE_INTERVAL) {
                 last = Instant::now();
                 app.update_weather().await.unwrap();
             }
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(500)).await;
         }
     });
 }
