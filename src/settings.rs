@@ -1,5 +1,6 @@
 use std::{fs, path::PathBuf};
 
+use crate::Result;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
@@ -33,18 +34,20 @@ impl Settings {
         self.get_path().exists()
     }
 
-    pub fn load(&mut self) {
-        let settings_string = fs::read_to_string(self.get_path()).unwrap();
-        let settings: Settings = toml::from_str(&settings_string).expect("Could not read settings file");
+    pub fn load(&mut self) -> Result<()> {
+        let settings_string = fs::read_to_string(self.get_path())?;
+        let settings: Settings = toml::from_str(&settings_string)?;
         *self = settings;
+        Ok(())
     }
 
-    pub fn save(&self) {
+    pub fn save(&self) -> Result<()> {
         let path = self.get_path();
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).expect("Could not create settings directory.");
+            fs::create_dir_all(parent)?;
         }
-        let settings_string = toml::to_string_pretty(&self).unwrap();
-        fs::write(path, settings_string).unwrap();
+        let settings_string = toml::to_string_pretty(&self)?;
+        fs::write(path, settings_string)?;
+        Ok(())
     }
 }

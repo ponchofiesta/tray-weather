@@ -1,13 +1,12 @@
+mod error;
 mod gui;
 mod settings;
 mod weather;
 
-use std::{
-    fmt::Display,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
+use error::{Error, Result};
 use gui::{show_settings_window, MenuMessage, WeatherTrayIcon};
 use log::{debug, trace};
 use reqwest;
@@ -15,58 +14,6 @@ use settings::Settings;
 use tokio::time::sleep;
 use tray_icon::menu::MenuEvent;
 use weather::{CurrentWeather, WeatherResponse};
-
-pub type Result<T> = core::result::Result<T, Error>;
-
-#[derive(Debug)]
-pub enum Error {
-    NoWeatherInfo,
-    TrayIconMenuError(tray_icon::menu::Error),
-    TrayIconError(tray_icon::Error),
-    ReqwestError(reqwest::Error),
-    IoError(std::io::Error),
-}
-
-impl std::error::Error for Error {}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-
-        match self {
-            NoWeatherInfo => write!(f, "Unbekannte Wetterbedingungen"),
-            TrayIconMenuError(err) => write!(f, "TrayIconMenuError: {}", err),
-            TrayIconError(err) => write!(f, "TrayIconError: {}", err),
-            ReqwestError(err) => write!(f, "RequestError: {}", err),
-            IoError(io_error) => write!(f, "{io_error}"),
-        }
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        Error::IoError(value)
-    }
-}
-
-impl From<reqwest::Error> for Error {
-    fn from(value: reqwest::Error) -> Self {
-        Error::ReqwestError(value)
-    }
-}
-
-impl From<tray_icon::Error> for Error {
-    fn from(value: tray_icon::Error) -> Self {
-        Error::TrayIconError(value)
-    }
-}
-
-impl From<tray_icon::menu::Error> for Error {
-    fn from(value: tray_icon::menu::Error) -> Self {
-        Error::TrayIconMenuError(value)
-    }
-}
-
 
 struct WeatherApp {
     settings: Settings,
@@ -112,31 +59,26 @@ impl WeatherApp {
 const UPDATE_INTERVAL: u64 = 60 * 15;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     env_logger::init();
 
     let mut settings = Settings::default();
     if settings.exists() {
-        settings.load();
+        settings.load()?;
     } else {
-        let new_settings = show_settings_window(&settings);
-        if new_settings.is_none() {
-            return;
-        }
-        settings = new_settings.unwrap();
-        settings.save();
+        settings = show_settings_window(&settings).ok_or(Error::NoSettings)?;
+        settings.save()?;
     }
 
     // Wolfsburg Ehmen
     // let location = (52.397120, 10.700460);
-    let mut app = WeatherApp::new(settings.clone()).unwrap();
+    let mut app = WeatherApp::new(settings.clone())?;
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
 
     let mut last = Instant::now()
-        .checked_sub(Duration::from_secs(UPDATE_INTERVAL))
-        .unwrap();
+        .checked_sub(Duration::from_secs(UPDATE_INTERVAL)).ok_or(Error::Instant)?;
 
     event_loop.block_on(async move {
         loop {
@@ -161,7 +103,7 @@ async fn main() {
                         .id()
                 {
                     if let Some(settings) = show_settings_window(&settings) {
-                        settings.save();
+                        settings.save().expect("Could not save settings.");
                         app.update_settings(settings.clone()).await.unwrap();
                     }
                 } else if event.id()

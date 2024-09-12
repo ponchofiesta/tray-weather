@@ -137,7 +137,7 @@ pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
         options,
         Box::new(|_cc| Ok(Box::new(settings_window))),
     )
-    .unwrap();
+    .ok()?;
 
     if let Ok(msg) = rx.try_recv() {
         return msg;
