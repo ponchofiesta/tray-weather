@@ -70,8 +70,6 @@ async fn main() -> Result<()> {
         settings.save()?;
     }
 
-    // Wolfsburg Ehmen
-    // let location = (52.397120, 10.700460);
     let mut app = WeatherApp::new(settings.clone())?;
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
