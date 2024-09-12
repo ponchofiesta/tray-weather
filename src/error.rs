@@ -4,10 +4,11 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    Instant,
     Io(std::io::Error),
     NoSettings,
+    Other(Box<dyn std::error::Error>),
     Reqwest(reqwest::Error),
-    Instant,
     TomlDe(toml::de::Error),
     TomlSer(toml::ser::Error),
     TrayIcon(tray_icon::Error),
@@ -21,15 +22,25 @@ impl Display for Error {
         use Error::*;
 
         match self {
-            Io(io_error) => write!(f, "{io_error}"),
             Instant => write!(f, "Time calculation failed."),
+            Io(io_error) => write!(f, "{io_error}"),
             NoSettings => write!(f, "No Settings were provided."),
+            Other(err) => write!(f, "Other error: {}", err),
             Reqwest(err) => write!(f, "RequestError: {}", err),
             TomlDe(err) => write!(f, "TomlDeError: {}", err),
             TomlSer(err) => write!(f, "TomlSerError: {}", err),
             TrayIcon(err) => write!(f, "TrayIconError: {}", err),
             TrayIconMenu(err) => write!(f, "TrayIconMenuError: {}", err),
         }
+    }
+}
+
+impl Error {
+    pub fn other<E>(error: E) -> Error
+    where
+        E: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        Self::Other(error.into())
     }
 }
 

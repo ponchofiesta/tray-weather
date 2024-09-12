@@ -9,7 +9,7 @@ use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
 use gui::{show_settings_window, MenuMessage, WeatherTrayIcon};
 use log::{debug, trace};
-use reqwest;
+use reqwest::{self, Url};
 use settings::Settings;
 use tokio::time::sleep;
 use tray_icon::menu::MenuEvent;
@@ -41,11 +41,14 @@ impl WeatherApp {
 
     async fn get_weather(&self) -> Result<CurrentWeather> {
         debug!("get_weather()");
-        let url = format!(
-            "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current_weather=true",
-            self.settings.latitude, self.settings.longitude
-        );
-        let response = reqwest::get(&url).await?.json::<WeatherResponse>().await?;
+        let params = [
+            ("latitude", self.settings.latitude.as_str()),
+            ("longitude", &self.settings.longitude.as_str()),
+            ("current_weather", "true"),
+        ];
+        let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
+            .map_err(|e| Error::other(e))?;
+        let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
         Ok(response.current_weather)
     }
 
@@ -76,7 +79,8 @@ async fn main() -> Result<()> {
     let window_target = event_loop.window_target().clone();
 
     let mut last = Instant::now()
-        .checked_sub(Duration::from_secs(UPDATE_INTERVAL)).ok_or(Error::Instant)?;
+        .checked_sub(Duration::from_secs(UPDATE_INTERVAL))
+        .ok_or(Error::Instant)?;
 
     event_loop.block_on(async move {
         loop {
