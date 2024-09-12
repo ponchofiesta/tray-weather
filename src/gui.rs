@@ -1,11 +1,16 @@
-use std::{collections::HashMap, sync::mpsc::{channel, Sender}};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Sender},
+};
 
 use eframe::egui::{self, TextEdit};
 use log::debug;
-use tray_icon::{menu::{Menu, MenuItem}, Icon, TrayIcon, TrayIconBuilder};
+use tray_icon::{
+    menu::{Menu, MenuItem},
+    Icon, TrayIcon, TrayIconBuilder,
+};
 
-use crate::{weather::CurrentWeather, Settings, Result};
-
+use crate::{weather::CurrentWeather, Result, Settings};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MenuMessage {
@@ -62,7 +67,6 @@ impl WeatherTrayIcon {
     }
 }
 
-
 pub(crate) struct SettingsWindow<T> {
     tx: Option<Sender<T>>,
     latitude: String,
@@ -89,18 +93,27 @@ impl<T> SettingsWindow<T> {
     }
 }
 
+impl<T> SettingsWindow<T> {
+    fn close_window(&self, ctx: &egui::Context) {
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        });
+    }
+}
+
 impl eframe::App for SettingsWindow<Option<Settings>> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     let latitude_label = ui.label("Breite: ");
-                    ui.add(TextEdit::singleline(&mut self.latitude).desired_width(60.0))
+                    ui.add(TextEdit::singleline(&mut self.latitude).desired_width(80.0))
                         .labelled_by(latitude_label.id);
                 });
                 ui.vertical(|ui| {
                     let longitude_label = ui.label("Länge: ");
-                    ui.add(TextEdit::singleline(&mut self.longitude).desired_width(60.0))
+                    ui.add(TextEdit::singleline(&mut self.longitude).desired_width(80.0))
                         .labelled_by(longitude_label.id);
                 });
             });
@@ -116,8 +129,9 @@ impl eframe::App for SettingsWindow<Option<Settings>> {
                         };
                         tx.send(Some(settings)).unwrap();
                     }
+                    self.close_window(ctx);
                 } else if cancel_button.clicked() {
-                    todo!("Close window");
+                    self.close_window(ctx);
                 }
             });
         });
