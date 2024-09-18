@@ -1,3 +1,4 @@
+mod app;
 mod error;
 mod gui;
 mod settings;
@@ -5,59 +6,14 @@ mod weather;
 
 use std::time::{Duration, Instant};
 
+use app::WeatherApp;
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
-use gui::{show_settings_window, MenuMessage, WeatherTrayIcon};
+use gui::{show_settings_window, MenuMessage};
 use log::{debug, trace};
-use reqwest::{self, Url};
 use settings::Settings;
 use tokio::time::sleep;
 use tray_icon::menu::MenuEvent;
-use weather::{CurrentWeather, WeatherResponse};
-
-struct WeatherApp {
-    settings: Settings,
-    tray_icon: WeatherTrayIcon,
-}
-
-impl WeatherApp {
-    fn new(settings: Settings) -> Result<Self> {
-        let tray_icon = WeatherTrayIcon::new()?;
-        Ok(WeatherApp {
-            settings,
-            tray_icon,
-        })
-    }
-
-    async fn update_weather(&self) -> Result<()> {
-        debug!("update_weather()");
-        let weather = self.get_weather().await;
-        match weather {
-            Ok(weather) => self.tray_icon.set_weather(&weather)?,
-            Err(err) => self.tray_icon.set_error(&format!("Fehler: {}", err))?,
-        };
-        Ok(())
-    }
-
-    async fn get_weather(&self) -> Result<CurrentWeather> {
-        debug!("get_weather()");
-        let params = [
-            ("latitude", self.settings.latitude.as_str()),
-            ("longitude", &self.settings.longitude.as_str()),
-            ("current_weather", "true"),
-        ];
-        let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
-            .map_err(|e| Error::other(e))?;
-        let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
-        Ok(response.current_weather)
-    }
-
-    async fn update_settings(&mut self, settings: Settings) -> Result<()> {
-        self.settings = settings;
-        self.update_weather().await?;
-        Ok(())
-    }
-}
 
 const UPDATE_INTERVAL: u64 = 60 * 15;
 

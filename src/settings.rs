@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct Settings {
     pub latitude: String,
     pub longitude: String,
+    #[serde(default)]
+    pub autorun_enabled: bool,
 }
 
 impl Default for Settings {
@@ -16,6 +18,7 @@ impl Default for Settings {
         Self {
             latitude: Default::default(),
             longitude: Default::default(),
+            autorun_enabled: false,
         }
     }
 }

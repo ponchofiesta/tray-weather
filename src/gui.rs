@@ -71,6 +71,7 @@ pub(crate) struct SettingsWindow<T> {
     tx: Option<Sender<T>>,
     latitude: String,
     longitude: String,
+    autorun_enabled: bool,
 }
 
 impl<T> Default for SettingsWindow<T> {
@@ -79,6 +80,7 @@ impl<T> Default for SettingsWindow<T> {
             tx: None,
             latitude: String::new(),
             longitude: String::new(),
+            autorun_enabled: false,
         }
     }
 }
@@ -89,6 +91,7 @@ impl<T> SettingsWindow<T> {
             tx: Some(tx),
             latitude: settings.latitude.clone(),
             longitude: settings.longitude.clone(),
+            autorun_enabled: settings.autorun_enabled,
         }
     }
 }
@@ -118,6 +121,9 @@ impl eframe::App for SettingsWindow<Option<Settings>> {
                 });
             });
             ui.horizontal(|ui| {
+                ui.checkbox(&mut self.autorun_enabled, "Start Tray Weather automatically");
+            });
+            ui.horizontal(|ui| {
                 let save_button = ui.button("Save");
                 let cancel_button = ui.button("Cancel");
 
@@ -126,6 +132,7 @@ impl eframe::App for SettingsWindow<Option<Settings>> {
                         let settings = Settings {
                             latitude: self.latitude.clone(),
                             longitude: self.longitude.clone(),
+                            autorun_enabled: self.autorun_enabled,
                         };
                         tx.send(Some(settings)).unwrap();
                     }
