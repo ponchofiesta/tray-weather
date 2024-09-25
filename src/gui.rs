@@ -5,12 +5,13 @@ use std::{
 
 use eframe::egui::{self, TextEdit};
 use log::debug;
+use rust_i18n::t;
 use tray_icon::{
     menu::{Menu, MenuItem},
     Icon, TrayIcon, TrayIconBuilder,
 };
 
-use crate::{weather::CurrentWeather, Result, Settings};
+use crate::{weather::CurrentWeather, Result, Settings, PROGRAM_NAME};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MenuMessage {
@@ -28,9 +29,9 @@ impl WeatherTrayIcon {
     pub fn new() -> Result<Self> {
         debug!("Building tray menu");
         let menu = Menu::new();
-        let item_update = MenuItem::new("Aktualisieren", true, None);
-        let item_config = MenuItem::new("Konfigurieren", true, None);
-        let item_exit = MenuItem::new("Beenden", true, None);
+        let item_update = MenuItem::new(t!("update"), true, None);
+        let item_config = MenuItem::new(t!("settings"), true, None);
+        let item_exit = MenuItem::new(t!("quit"), true, None);
         menu.append(&item_update)?;
         menu.append(&item_config)?;
         menu.append(&item_exit)?;
@@ -110,22 +111,22 @@ impl eframe::App for SettingsWindow<Option<Settings>> {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    let latitude_label = ui.label("Breite: ");
+                    let latitude_label = ui.label(t!("latitude"));
                     ui.add(TextEdit::singleline(&mut self.latitude).desired_width(80.0))
                         .labelled_by(latitude_label.id);
                 });
                 ui.vertical(|ui| {
-                    let longitude_label = ui.label("Länge: ");
+                    let longitude_label = ui.label(t!("longitude"));
                     ui.add(TextEdit::singleline(&mut self.longitude).desired_width(80.0))
                         .labelled_by(longitude_label.id);
                 });
             });
             ui.horizontal(|ui| {
-                ui.checkbox(&mut self.autorun_enabled, "Start Tray Weather automatically");
+                ui.checkbox(&mut self.autorun_enabled, t!("autostart", name = PROGRAM_NAME));
             });
             ui.horizontal(|ui| {
-                let save_button = ui.button("Save");
-                let cancel_button = ui.button("Cancel");
+                let save_button = ui.button(t!("dialog.save"));
+                let cancel_button = ui.button(t!("dialog.cancel"));
 
                 if save_button.clicked() {
                     if let Some(tx) = &self.tx {
@@ -154,7 +155,7 @@ pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
         ..Default::default()
     };
     eframe::run_native(
-        "Tray Weather: Settings",
+        &t!("settings_title", name = PROGRAM_NAME),
         options,
         Box::new(|_cc| Ok(Box::new(settings_window))),
     )

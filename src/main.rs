@@ -15,11 +15,22 @@ use settings::Settings;
 use tokio::time::sleep;
 use tray_icon::menu::MenuEvent;
 
+pub const PROGRAM_NAME: &str = "Tray Weather";
+
 const UPDATE_INTERVAL: u64 = 60 * 15;
+
+rust_i18n::i18n!("locales");
+
+fn localization() {
+    let locale = sys_locale::get_locale().unwrap_or_else(|| String::from("en"));
+    debug!("Locale detected: {}", locale);
+    rust_i18n::set_locale(&locale);
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
+    localization();
 
     let mut settings = Settings::default();
     if settings.exists() {

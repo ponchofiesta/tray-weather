@@ -1,3 +1,6 @@
+use std::borrow::Cow;
+
+use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -36,37 +39,37 @@ pub(crate) struct CurrentWeather {
 }
 
 impl CurrentWeather {
-    pub fn description(&self) -> &str {
+    pub fn description(&self) -> Cow<'_, str> {
         match self.weathercode {
-            0 => "Klarer Himmel",
-            1 => "Überwiegend klar",
-            2 => "Teilweise bewölkt",
-            3 => "Bewölkt",
-            45 => "Nebel",
-            48 => "Reif-Nebel",
-            51 => "Leichter Nieselregen",
-            53 => "Mäßiger Nieselregen",
-            55 => "Starker Nieselregen",
-            56 => "Leichter gefrierender Nieselregen",
-            57 => "Starker gefrierender Nieselregen",
-            61 => "Leichter Regen",
-            63 => "Mäßiger Regen",
-            65 => "Starker Regen",
-            66 => "Leichter gefrierender Regen",
-            67 => "Starker gefrierender Regen",
-            71 => "Leichter Schneefall",
-            73 => "Mäßiger Schneefall",
-            75 => "Starker Schneefall",
-            77 => "Schneekörner",
-            80 => "Leichte Regenschauer",
-            81 => "Mäßige Regenschauer",
-            82 => "Heftige Regenschauer",
-            85 => "Leichte Schneeschauer",
-            86 => "Starke Schneeschauer",
-            95 => "Gewitter",
-            96 => "Gewitter mit leichtem Hagel",
-            99 => "Gewitter mit starkem Hagel",
-            _ => "Unbekannte Wetterbedingungen",
+            0 => t!("weather.clear_sky"),
+            1 => t!("weather.mainly_clear"),
+            2 => t!("weather.partly_cloudy"),
+            3 => t!("weather.overcast"),
+            45 => t!("weather.fog"),
+            48 => t!("weather.rime_fog"),
+            51 => t!("weather.light_drizzle"),
+            53 => t!("weather.moderate_drizzle"),
+            55 => t!("weather.dense_drizzle"),
+            56 => t!("weather.light_freezing_drizzle"),
+            57 => t!("weather.dense_freezing_drizzle"),
+            61 => t!("weather.light_rain"),
+            63 => t!("weather.moderate_rain"),
+            65 => t!("weather.heavy_rain"),
+            66 => t!("weather.light_freezing_rain"),
+            67 => t!("weather.heavy_freezing_rain"),
+            71 => t!("weather.light_snow"),
+            73 => t!("weather.moderate_snow"),
+            75 => t!("weather.heavy_snow"),
+            77 => t!("weather.snow_grains"),
+            80 => t!("weather.light_rain_showers"),
+            81 => t!("weather.moderate_rain_showers"),
+            82 => t!("weather.heavy_rain_showers"),
+            85 => t!("weather.light_snow_showers"),
+            86 => t!("weather.heavy_snow_showers"),
+            95 => t!("weather.thunderstorm"),
+            96 => t!("weather.thurderstorm_with_light_hail"),
+            99 => t!("weather.thunderstorm_with_heavy_hail"),
+            _ => t!("weather.unknown"),
         }
     }
 
