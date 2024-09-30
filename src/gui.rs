@@ -1,17 +1,22 @@
 use std::{
     collections::HashMap,
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{channel, Receiver, Sender},
 };
 
-use eframe::egui::{self, TextEdit};
+use eframe::egui::{self, Label, TextEdit, Ui};
 use log::debug;
+use reqwest::Url;
 use rust_i18n::t;
 use tray_icon::{
     menu::{Menu, MenuItem},
     Icon, TrayIcon, TrayIconBuilder,
 };
 
-use crate::{weather::CurrentWeather, Result, Settings, PROGRAM_NAME};
+use crate::{
+    error::Error,
+    weather::{CurrentWeather, Location, Results},
+    Result, Settings, PROGRAM_NAME,
+};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MenuMessage {
@@ -47,12 +52,13 @@ impl WeatherTrayIcon {
         })
     }
 
-    pub fn set_weather(&self, weather: &CurrentWeather) -> Result<()> {
+    pub fn set_weather(&self, location: &Location, weather: &CurrentWeather) -> Result<()> {
         debug!("Set weather: {:?}", &weather);
         self.tray_icon
             .set_icon(Icon::from_resource_name(weather.icon_name(), None).ok())?;
         self.tray_icon.set_tooltip(Some(format!(
-            "{} - {}",
+            "{}: {} - {}",
+            location.name,
             weather.temperature,
             weather.description()
         )))?;
@@ -68,36 +74,51 @@ impl WeatherTrayIcon {
     }
 }
 
-pub(crate) struct SettingsWindow<T> {
-    tx: Option<Sender<T>>,
-    latitude: String,
-    longitude: String,
+enum SettingsScreen {
+    Home,
+    Location,
+}
+
+pub(crate) struct SettingsWindow {
+    tx_window: Option<Sender<Option<Settings>>>,
+    rx_locations: Option<Receiver<Result<Vec<Location>>>>,
+    tx_locations: Option<Sender<Result<Vec<Location>>>>,
+    location: Location,
+    location_name: String,
+    found_locations: Option<Vec<Location>>,
     autorun_enabled: bool,
+    screen: SettingsScreen,
 }
 
-impl<T> Default for SettingsWindow<T> {
+impl Default for SettingsWindow {
     fn default() -> Self {
+        let locations_channel = channel();
         Self {
-            tx: None,
-            latitude: String::new(),
-            longitude: String::new(),
+            tx_window: None,
+            rx_locations: Some(locations_channel.1),
+            tx_locations: Some(locations_channel.0),
+            location: Default::default(),
+            location_name: "".into(),
+            found_locations: None,
             autorun_enabled: false,
+            screen: SettingsScreen::Home,
         }
     }
 }
 
-impl<T> SettingsWindow<T> {
-    pub fn new(tx: Sender<T>, settings: &Settings) -> Self {
+impl SettingsWindow {
+    pub fn new(tx: Sender<Option<Settings>>, settings: &Settings) -> Self {
         SettingsWindow {
-            tx: Some(tx),
-            latitude: settings.latitude.clone(),
-            longitude: settings.longitude.clone(),
+            tx_window: Some(tx),
+            location: settings.location.clone(),
             autorun_enabled: settings.autorun_enabled,
+            screen: SettingsScreen::Home,
+            ..Default::default()
         }
     }
 }
 
-impl<T> SettingsWindow<T> {
+impl SettingsWindow {
     fn close_window(&self, ctx: &egui::Context) {
         let ctx = ctx.clone();
         std::thread::spawn(move || {
@@ -106,42 +127,98 @@ impl<T> SettingsWindow<T> {
     }
 }
 
-impl eframe::App for SettingsWindow<Option<Settings>> {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    let latitude_label = ui.label(t!("latitude"));
-                    ui.add(TextEdit::singleline(&mut self.latitude).desired_width(80.0))
-                        .labelled_by(latitude_label.id);
-                });
-                ui.vertical(|ui| {
-                    let longitude_label = ui.label(t!("longitude"));
-                    ui.add(TextEdit::singleline(&mut self.longitude).desired_width(80.0))
-                        .labelled_by(longitude_label.id);
-                });
-            });
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut self.autorun_enabled, t!("autostart", name = PROGRAM_NAME));
-            });
-            ui.horizontal(|ui| {
-                let save_button = ui.button(t!("dialog.save"));
-                let cancel_button = ui.button(t!("dialog.cancel"));
+impl SettingsWindow {
+    fn settings_screen(&mut self, ctx: &egui::Context, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                let location_label = ui.label(t!("location"));
+                ui.add(Label::new(self.location.to_human_readable()))
+                    .labelled_by(location_label.id);
 
-                if save_button.clicked() {
-                    if let Some(tx) = &self.tx {
-                        let settings = Settings {
-                            latitude: self.latitude.clone(),
-                            longitude: self.longitude.clone(),
-                            autorun_enabled: self.autorun_enabled,
-                        };
-                        tx.send(Some(settings)).unwrap();
-                    }
-                    self.close_window(ctx);
-                } else if cancel_button.clicked() {
-                    self.close_window(ctx);
+                if ui.button(t!("new_location")).clicked() {
+                    self.screen = SettingsScreen::Location;
                 }
             });
+        });
+        ui.horizontal(|ui| {
+            ui.checkbox(
+                &mut self.autorun_enabled,
+                t!("autostart", name = PROGRAM_NAME),
+            );
+        });
+        ui.horizontal(|ui| {
+            let save_button = ui.button(t!("dialog.save"));
+            let cancel_button = ui.button(t!("dialog.cancel"));
+
+            if save_button.clicked() {
+                if let Some(tx) = &self.tx_window {
+                    let settings = Settings {
+                        location: self.location.clone(),
+                        autorun_enabled: self.autorun_enabled,
+                    };
+                    tx.send(Some(settings)).unwrap();
+                }
+                self.close_window(ctx);
+            } else if cancel_button.clicked() {
+                self.close_window(ctx);
+            }
+        });
+    }
+
+    fn location_screen(&mut self, ui: &mut Ui) {
+        match &self.rx_locations {
+            Some(rx) => match rx.try_recv() {
+                Ok(response) => match response {
+                    Ok(found_locations) => self.found_locations = Some(found_locations),
+                    Err(e) => todo!("Could not get locations: {}", e),
+                },
+                Err(_) => (),
+            },
+            None => (),
+        };
+
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                let location_label = ui.label(t!("location"));
+                ui.add(TextEdit::singleline(&mut self.location_name).desired_width(80.0))
+                    .labelled_by(location_label.id);
+            });
+        });
+        ui.horizontal(|ui| {
+            if ui.button(t!("search_location")).clicked() {
+                let name: String = self.location_name.clone();
+                let tx = match &self.tx_locations {
+                    Some(tx) => tx.clone(),
+                    None => panic!(),
+                };
+                tokio::spawn(async move {
+                    let results = search_location(&name, "de").await;
+                    tx.send(results).unwrap();
+                });
+            }
+        });
+        ui.horizontal(|ui| {
+            if let Some(locations) = &self.found_locations {
+                ui.vertical(|ui| {
+                    for location in locations {
+                        if ui.button(location.to_human_readable()).clicked() {
+                            self.location = location.clone();
+                            self.screen = SettingsScreen::Home;
+                        }
+                    }
+                });
+            }
+        });
+    }
+}
+
+impl eframe::App for SettingsWindow {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match self.screen {
+                SettingsScreen::Home => self.settings_screen(ctx, ui),
+                SettingsScreen::Location => self.location_screen(ui),
+            };
         });
     }
 }
@@ -166,4 +243,17 @@ pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
     } else {
         return None;
     }
+}
+
+pub(crate) async fn search_location(name: &str, lang: &str) -> Result<Vec<Location>> {
+    let params = [
+        ("name", name),
+        ("language", lang),
+        ("count", "10"),
+        ("format", "json"),
+    ];
+    let url = Url::parse_with_params("https://geocoding-api.open-meteo.com/v1/search", &params)
+        .map_err(|e| Error::other(e))?;
+    let response = reqwest::get(url).await?.json::<Results>().await?;
+    Ok(response.results)
 }

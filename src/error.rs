@@ -16,6 +16,9 @@ pub enum Error {
     TrayIconMenu(tray_icon::menu::Error),
 }
 
+unsafe impl Sync for Error {}
+unsafe impl Send for Error {}
+
 impl std::error::Error for Error {}
 
 impl Display for Error {

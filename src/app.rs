@@ -2,7 +2,12 @@ use auto_launch::AutoLaunch;
 use log::debug;
 use reqwest::Url;
 
-use crate::{error::{Error, Result}, gui::WeatherTrayIcon, settings::Settings, weather::{CurrentWeather, WeatherResponse}};
+use crate::{
+    error::{Error, Result},
+    gui::WeatherTrayIcon,
+    settings::Settings,
+    weather::{CurrentWeather, WeatherResponse},
+};
 
 pub(crate) struct WeatherApp {
     pub settings: Settings,
@@ -22,7 +27,9 @@ impl WeatherApp {
         debug!("update_weather()");
         let weather = self.get_weather().await;
         match weather {
-            Ok(weather) => self.tray_icon.set_weather(&weather)?,
+            Ok(weather) => self
+                .tray_icon
+                .set_weather(&self.settings.location, &weather)?,
             Err(err) => self.tray_icon.set_error(&format!("Fehler: {}", err))?,
         };
         Ok(())
@@ -31,9 +38,9 @@ impl WeatherApp {
     pub async fn get_weather(&self) -> Result<CurrentWeather> {
         debug!("get_weather()");
         let params = [
-            ("latitude", self.settings.latitude.as_str()),
-            ("longitude", &self.settings.longitude.as_str()),
-            ("current_weather", "true"),
+            ("latitude", self.settings.location.latitude.to_string()),
+            ("longitude", self.settings.location.longitude.to_string()),
+            ("current_weather", "true".into()),
         ];
         let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
             .map_err(|e| Error::other(e))?;
@@ -47,13 +54,15 @@ impl WeatherApp {
         self.update_weather().await?;
         Ok(())
     }
-    
+
     pub fn set_autorun(&self, autorun_enabled: bool) -> Result<()> {
         let path = std::env::current_exe()?;
         let auto = AutoLaunch::new("Tray Weather", &path.to_string_lossy(), &[] as &[&str]);
-        if autorun_enabled {
+        let is_enabled = auto.is_enabled()?;
+
+        if autorun_enabled && !is_enabled {
             auto.enable()?;
-        } else {
+        } else if !autorun_enabled && is_enabled {
             auto.disable()?;
         }
         Ok(())

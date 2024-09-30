@@ -1,8 +1,9 @@
 _version: 1
 
 settings_title: "%{name}: Einstellungen"
-latitude: "Breite: "
-longitude: "Länge: "
+location: "Ort: "
+new_location: Ort suchen
+search_location: Ort suchen
 autostart: "%{name} automatisch starten"
 
 update: Wetter aktualisieren

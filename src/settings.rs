@@ -1,14 +1,12 @@
 use std::{fs, path::PathBuf};
 
-use crate::Result;
+use crate::{weather::Location, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Settings {
-    pub latitude: String,
-    pub longitude: String,
+    pub location: Location,
     #[serde(default)]
     pub autorun_enabled: bool,
 }
@@ -16,8 +14,7 @@ pub(crate) struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            latitude: Default::default(),
-            longitude: Default::default(),
+            location: Default::default(),
             autorun_enabled: false,
         }
     }

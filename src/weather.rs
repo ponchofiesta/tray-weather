@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct Location {
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+pub(crate) struct Location {
     pub id: u32,
     pub name: String,
     pub latitude: f64,
@@ -12,19 +12,42 @@ pub struct Location {
     pub elevation: f64,
     pub feature_code: String,
     pub country_code: String,
-    pub admin1_id: u32,
-    pub admin2_id: u32,
-    pub admin3_id: u32,
-    pub admin4_id: u32,
+    pub admin1_id: Option<u32>,
+    pub admin2_id: Option<u32>,
+    pub admin3_id: Option<u32>,
+    pub admin4_id: Option<u32>,
     pub timezone: String,
-    pub population: u32,
-    pub postcodes: Vec<String>,
+    pub population: Option<u32>,
+    pub postcodes: Option<Vec<String>>,
     pub country_id: u32,
     pub country: String,
-    pub admin1: String,
-    pub admin2: String,
-    pub admin3: String,
-    pub admin4: String,
+    pub admin1: Option<String>,
+    pub admin2: Option<String>,
+    pub admin3: Option<String>,
+    pub admin4: Option<String>,
+}
+
+impl Location {
+    pub fn to_human_readable(&self) -> String {
+        std::iter::once(self.name.as_str())
+            .chain(
+                [
+                    self.admin1.as_ref(),
+                    self.admin2.as_ref(),
+                    self.admin3.as_ref(),
+                    self.admin4.as_ref(),
+                ]
+                .iter()
+                .filter_map(|&opt| opt.map(String::as_str)),
+            )
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Results {
+    pub results: Vec<Location>,
 }
 
 #[derive(Deserialize, Debug)]
