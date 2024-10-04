@@ -1,9 +1,12 @@
 _version: 1
 
 settings_title: "%{name}: Settings"
-location: "Location: "
+settings_heading: Settings
+location: Location
+location_heading: Search location
 new_location: Search location
 search_location: Search location
+empty_location: No location. Choose one!
 autostart: Start %{name} automatically
 
 update: Update weather

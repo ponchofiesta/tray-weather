@@ -1,9 +1,12 @@
 _version: 1
 
 settings_title: "%{name}: Einstellungen"
-location: "Ort: "
+settings_heading: Einstellungen
+location: Ort
+location_heading: Ort suchen
 new_location: Ort suchen
 search_location: Ort suchen
+empty_location: Kein Ort. Wähle einen!
 autostart: "%{name} automatisch starten"
 
 update: Wetter aktualisieren
