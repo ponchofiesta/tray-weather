@@ -183,22 +183,26 @@ impl SettingsWindow {
         ui.heading(t!("location_heading"));
 
         ui.horizontal(|ui| {
-                let location_label = ui.label(t!("location"));
+            let location_label = ui.label(t!("location"));
 
-                ui.add(TextEdit::singleline(&mut self.location_name).desired_width(80.0))
-                    .labelled_by(location_label.id);
+            ui.add(
+                TextEdit::singleline(&mut self.location_name)
+                    .desired_width(80.0)
+                    .margin(egui::Margin::symmetric(12.0, 8.0)),
+            )
+            .labelled_by(location_label.id);
 
-                if ui.button(t!("search_location")).clicked() {
-                    let name: String = self.location_name.clone();
-                    let tx = match &self.tx_locations {
-                        Some(tx) => tx.clone(),
-                        None => panic!(),
-                    };
-                    tokio::spawn(async move {
-                        let results = search_location(&name, "de").await;
-                        tx.send(results).unwrap();
-                    });
-                }
+            if ui.button(t!("search_location")).clicked() {
+                let name: String = self.location_name.clone();
+                let tx = match &self.tx_locations {
+                    Some(tx) => tx.clone(),
+                    None => panic!(),
+                };
+                tokio::spawn(async move {
+                    let results = search_location(&name, "de").await;
+                    tx.send(results).unwrap();
+                });
+            }
         });
 
         ui.separator();
