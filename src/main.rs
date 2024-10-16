@@ -94,9 +94,10 @@ async fn main() -> Result<()> {
                         if menuevent.id() == item_update.id() {
                             app.update_weather().await.unwrap();
                         } else if menuevent.id() == item_config.id() {
-                            if let Some(settings) = show_settings_window(&settings) {
-                                settings.save().expect("Could not save settings.");
-                                app.update_settings(settings.clone()).await.unwrap();
+                            if let Some(new_settings) = show_settings_window(&settings) {
+                                new_settings.save().expect("Could not save settings.");
+                                app.update_settings(new_settings.clone()).await.unwrap();
+                                settings = new_settings;
                             }
                         } else if menuevent.id() == item_exit.id() {
                             window_target.exit().await;
