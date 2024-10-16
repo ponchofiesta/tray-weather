@@ -1,16 +1,10 @@
-use std::{
-    collections::HashMap,
-    sync::mpsc::{channel, Receiver, Sender},
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use eframe::egui::{self, Checkbox, TextEdit, Ui};
 use log::debug;
 use reqwest::Url;
 use rust_i18n::t;
-use tray_icon::{
-    menu::{Menu, MenuItem},
-    Icon, TrayIcon, TrayIconBuilder,
-};
+use tray_icon::{menu::Menu, Icon, TrayIcon, TrayIconBuilder};
 
 use crate::{
     error::Error,
@@ -18,37 +12,15 @@ use crate::{
     Result, Settings, PROGRAM_NAME,
 };
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub(crate) enum MenuMessage {
-    Update,
-    Config,
-    Exit,
-}
-
 pub(crate) struct WeatherTrayIcon {
     pub tray_icon: TrayIcon,
-    pub menu_items: HashMap<MenuMessage, MenuItem>,
 }
 
 impl WeatherTrayIcon {
-    pub fn new() -> Result<Self> {
+    pub fn new(menu: Menu) -> Result<Self> {
         debug!("Building tray menu");
-        let menu = Menu::new();
-        let item_update = MenuItem::new(t!("update"), true, None);
-        let item_config = MenuItem::new(t!("settings"), true, None);
-        let item_exit = MenuItem::new(t!("quit"), true, None);
-        menu.append(&item_update)?;
-        menu.append(&item_config)?;
-        menu.append(&item_exit)?;
-
-        let mut menu_items = HashMap::new();
-        menu_items.insert(MenuMessage::Update, item_update);
-        menu_items.insert(MenuMessage::Config, item_config);
-        menu_items.insert(MenuMessage::Exit, item_exit);
-
         Ok(WeatherTrayIcon {
             tray_icon: TrayIconBuilder::new().with_menu(Box::new(menu)).build()?,
-            menu_items,
         })
     }
 

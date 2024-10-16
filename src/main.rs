@@ -11,10 +11,11 @@ use std::time::Duration;
 use app::WeatherApp;
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
-use gui::{show_settings_window, MenuMessage};
+use gui::show_settings_window;
 use log::{debug, trace};
+use rust_i18n::t;
 use settings::Settings;
-use tray_icon::menu::MenuEvent;
+use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 
 pub const PROGRAM_NAME: &str = "Tray Weather";
 
@@ -38,6 +39,7 @@ async fn main() -> Result<()> {
     env_logger::init();
     localization();
 
+    // Load app settings
     let mut settings = Settings::default();
     if settings.exists() {
         settings.load()?;
@@ -46,12 +48,19 @@ async fn main() -> Result<()> {
         settings.save()?;
     }
 
-    let mut app = WeatherApp::new(settings.clone())?;
+    // Build tray menu
+    let item_update = MenuItem::new(t!("update"), true, None);
+    let item_config = MenuItem::new(t!("settings"), true, None);
+    let item_exit = MenuItem::new(t!("quit"), true, None);
+    let menu = Menu::with_items(&[&item_update, &item_config, &item_exit])?;
+
+    let mut app = WeatherApp::new(settings.clone(), menu)?;
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
 
+    // Ticker for update interval
     let timer_tx = tx.clone();
     tokio::spawn(async move {
         loop {
@@ -60,6 +69,7 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Proxy for menu events
     let menu_tx = tx.clone();
     tokio::spawn(async move {
         loop {
@@ -69,45 +79,31 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Initial weather update
+    app.update_weather().await?;
+
+    // Run main event loop
     event_loop.block_on(async move {
         loop {
-            trace!("loop");
+            trace!("eventloop iteration starts");
             if let Some(msg) = rx.recv().await {
                 match msg {
+                    // An item of tray menu was clicked
                     Message::Menu(menuevent) => {
                         debug!("Menu event: {:?}", menuevent);
-                        if menuevent.id()
-                            == app
-                                .tray_icon
-                                .menu_items
-                                .get(&MenuMessage::Update)
-                                .unwrap()
-                                .id()
-                        {
+                        if menuevent.id() == item_update.id() {
                             app.update_weather().await.unwrap();
-                        } else if menuevent.id()
-                            == app
-                                .tray_icon
-                                .menu_items
-                                .get(&MenuMessage::Config)
-                                .unwrap()
-                                .id()
-                        {
+                        } else if menuevent.id() == item_config.id() {
                             if let Some(settings) = show_settings_window(&settings) {
                                 settings.save().expect("Could not save settings.");
                                 app.update_settings(settings.clone()).await.unwrap();
                             }
-                        } else if menuevent.id()
-                            == app
-                                .tray_icon
-                                .menu_items
-                                .get(&MenuMessage::Exit)
-                                .unwrap()
-                                .id()
-                        {
+                        } else if menuevent.id() == item_exit.id() {
                             window_target.exit().await;
                         }
                     }
+
+                    // The timer ticked
                     Message::Timer => app.update_weather().await.unwrap(),
                 }
             }

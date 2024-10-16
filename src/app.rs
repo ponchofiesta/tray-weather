@@ -1,6 +1,7 @@
 use auto_launch::AutoLaunch;
 use log::debug;
 use reqwest::Url;
+use tray_icon::menu::Menu;
 
 use crate::{
     error::{Error, Result},
@@ -15,8 +16,8 @@ pub(crate) struct WeatherApp {
 }
 
 impl WeatherApp {
-    pub fn new(settings: Settings) -> Result<Self> {
-        let tray_icon = WeatherTrayIcon::new()?;
+    pub fn new(settings: Settings, menu: Menu) -> Result<Self> {
+        let tray_icon = WeatherTrayIcon::new(menu)?;
         Ok(WeatherApp {
             settings,
             tray_icon,
