@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
     let item_exit = MenuItem::new(t!("quit"), true, None);
     let menu = Menu::with_items(&[&item_update, &item_config, &item_exit])?;
 
-    let mut app = WeatherApp::new(settings.clone(), menu)?;
+    let mut app = WeatherApp::new(settings, menu)?;
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
@@ -94,10 +94,10 @@ async fn main() -> Result<()> {
                         if menuevent.id() == item_update.id() {
                             app.update_weather().await.unwrap();
                         } else if menuevent.id() == item_config.id() {
-                            if let Some(new_settings) = show_settings_window(&settings) {
-                                new_settings.save().expect("Could not save settings.");
-                                app.update_settings(new_settings.clone()).await.unwrap();
-                                settings = new_settings;
+                            if let Some(new_settings) = show_settings_window(&app.settings) {
+                                app.settings.update(&new_settings);
+                                app.settings.save().expect("Could not save settings.");
+                                app.update_settings().await.unwrap();
                             }
                         } else if menuevent.id() == item_exit.id() {
                             window_target.exit().await;

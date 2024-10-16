@@ -21,6 +21,10 @@ impl Default for Settings {
 }
 
 impl Settings {
+    pub fn update(&mut self, new_settings: &Settings) {
+        *self = new_settings.clone();
+    }
+
     fn get_path(&self) -> PathBuf {
         if let Some(proj_dirs) = ProjectDirs::from("de", "osor", "TrayWeather") {
             let config_dir = proj_dirs.config_dir();

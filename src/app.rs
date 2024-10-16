@@ -30,8 +30,7 @@ impl WeatherApp {
         Ok(())
     }
 
-    pub async fn update_settings(&mut self, settings: Settings) -> Result<()> {
-        self.settings = settings;
+    pub async fn update_settings(&mut self) -> Result<()> {
         self.set_autorun(self.settings.autorun_enabled)?;
         self.update_weather().await?;
         Ok(())
