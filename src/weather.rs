@@ -1,10 +1,13 @@
 use std::borrow::Cow;
 
 use crate::error::{Error, Result};
+use image::load_from_memory_with_format;
 use log::debug;
 use reqwest::Url;
+use rust_embed::Embed;
 use rust_i18n::t;
 use serde::{Deserialize, Serialize};
+use tray_icon::Icon;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub(crate) struct Location {
@@ -163,4 +166,21 @@ pub async fn get_weather(location: &Location) -> Result<CurrentWeather> {
         .map_err(|e| Error::other(e))?;
     let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
     Ok(response.current_weather)
+}
+
+#[derive(Embed)]
+#[folder = "assets"]
+#[include = "*.ico"]
+pub struct EmbeddedFiles;
+
+/// Load [Icon] from embeded file
+pub fn get_icon(path: &str) -> Result<Icon> {
+    let bytes = EmbeddedFiles::get(path)
+        .ok_or_else(|| Error::other(format!("Icon file {path} not found.")))?;
+    let img =
+        load_from_memory_with_format(&bytes.data, image::ImageFormat::Ico).map_err(Error::other)?;
+    let rgba = img.to_rgba8();
+    let raw = rgba.into_raw();
+    let icon = Icon::from_rgba(raw, img.width(), img.height()).map_err(Error::other)?;
+    Ok(icon)
 }

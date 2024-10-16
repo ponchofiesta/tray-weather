@@ -1,5 +1,7 @@
 #!/bin/bash -e
-declare -a res=(16 20 24 32 40 48 64 256)
+
+# Size recommended here: https://learn.microsoft.com/de-de/windows/win32/shell/notification-area?redirectedfrom=MSDN#install_icon
+declare -a res=(16 32)
 for f in *.svg
 do
     declare -a png_files=()

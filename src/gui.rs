@@ -6,8 +6,7 @@ use rust_i18n::t;
 use tray_icon::{menu::Menu, Icon, TrayIcon, TrayIconBuilder};
 
 use crate::{
-    weather::search_location,
-    weather::{CurrentWeather, Location},
+    weather::{get_icon, search_location, CurrentWeather, Location},
     Result, Settings, PROGRAM_NAME,
 };
 
@@ -25,8 +24,9 @@ impl WeatherTrayIcon {
 
     pub fn set_weather(&self, location: &Location, weather: &CurrentWeather) -> Result<()> {
         debug!("Set weather: {:?}", &weather);
-        self.tray_icon
-            .set_icon(Icon::from_resource_name(weather.icon_name(), None).ok())?;
+        let icon_path = format!("weathericons/ico/{}.ico", weather.icon_name());
+        let icon = get_icon(&icon_path)?;
+        self.tray_icon.set_icon(Some(icon))?;
         self.tray_icon.set_tooltip(Some(format!(
             "{}: {} - {}",
             location.name,
@@ -39,8 +39,8 @@ impl WeatherTrayIcon {
     pub fn set_error(&self, msg: &str) -> Result<()> {
         debug!("Set error: {}", msg);
         self.tray_icon.set_tooltip(Some(msg))?;
-        self.tray_icon
-            .set_icon(Icon::from_resource_name("exclamation-circle", None).ok())?;
+        let icon = get_icon("tabler-icons/exclamation-circle.ico")?;
+        self.tray_icon.set_icon(Some(icon))?;
         Ok(())
     }
 }
