@@ -1,14 +1,8 @@
 use auto_launch::AutoLaunch;
 use log::debug;
-use reqwest::Url;
 use tray_icon::menu::Menu;
 
-use crate::{
-    error::{Error, Result},
-    gui::WeatherTrayIcon,
-    settings::Settings,
-    weather::{CurrentWeather, WeatherResponse},
-};
+use crate::{error::Result, gui::WeatherTrayIcon, settings::Settings, weather::get_weather};
 
 pub(crate) struct WeatherApp {
     pub settings: Settings,
@@ -26,7 +20,7 @@ impl WeatherApp {
 
     pub async fn update_weather(&self) -> Result<()> {
         debug!("update_weather()");
-        let weather = self.get_weather().await;
+        let weather = get_weather(&self.settings.location).await;
         match weather {
             Ok(weather) => self
                 .tray_icon
@@ -34,19 +28,6 @@ impl WeatherApp {
             Err(err) => self.tray_icon.set_error(&format!("Fehler: {}", err))?,
         };
         Ok(())
-    }
-
-    pub async fn get_weather(&self) -> Result<CurrentWeather> {
-        debug!("get_weather()");
-        let params = [
-            ("latitude", self.settings.location.latitude.to_string()),
-            ("longitude", self.settings.location.longitude.to_string()),
-            ("current_weather", "true".into()),
-        ];
-        let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
-            .map_err(|e| Error::other(e))?;
-        let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
-        Ok(response.current_weather)
     }
 
     pub async fn update_settings(&mut self, settings: Settings) -> Result<()> {

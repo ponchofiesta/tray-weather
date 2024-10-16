@@ -1,5 +1,8 @@
 use std::borrow::Cow;
 
+use crate::error::{Error, Result};
+use log::debug;
+use reqwest::Url;
 use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 
@@ -50,11 +53,13 @@ pub(crate) struct Results {
     pub results: Vec<Location>,
 }
 
+/// Representation for OpenMeteo REST weather response object
 #[derive(Deserialize, Debug)]
 pub(crate) struct WeatherResponse {
     pub current_weather: CurrentWeather,
 }
 
+/// Representation for OpenMeteo REST current_weather object
 #[derive(Deserialize, Debug)]
 pub(crate) struct CurrentWeather {
     pub temperature: f64,
@@ -62,6 +67,7 @@ pub(crate) struct CurrentWeather {
 }
 
 impl CurrentWeather {
+    /// Get a description string for Open Meteo weather code
     pub fn description(&self) -> Cow<'_, str> {
         match self.weathercode {
             0 => t!("weather.clear_sky"),
@@ -129,4 +135,32 @@ impl CurrentWeather {
             _ => "exclamation-circle",
         }
     }
+}
+
+/// Search a location name on Open Meteo
+pub(crate) async fn search_location(name: &str, lang: &str) -> Result<Vec<Location>> {
+    let params = [
+        ("name", name),
+        ("language", lang),
+        ("count", "10"),
+        ("format", "json"),
+    ];
+    let url = Url::parse_with_params("https://geocoding-api.open-meteo.com/v1/search", &params)
+        .map_err(|e| Error::other(e))?;
+    let response = reqwest::get(url).await?.json::<Results>().await?;
+    Ok(response.results)
+}
+
+/// Get current weather on Open Meteo for specific [Location]
+pub async fn get_weather(location: &Location) -> Result<CurrentWeather> {
+    debug!("get_weather()");
+    let params = [
+        ("latitude", location.latitude.to_string()),
+        ("longitude", location.longitude.to_string()),
+        ("current_weather", "true".into()),
+    ];
+    let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
+        .map_err(|e| Error::other(e))?;
+    let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
+    Ok(response.current_weather)
 }

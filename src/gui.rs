@@ -2,13 +2,12 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 
 use eframe::egui::{self, Checkbox, TextEdit, Ui};
 use log::debug;
-use reqwest::Url;
 use rust_i18n::t;
 use tray_icon::{menu::Menu, Icon, TrayIcon, TrayIconBuilder};
 
 use crate::{
-    error::Error,
-    weather::{CurrentWeather, Location, Results},
+    weather::search_location,
+    weather::{CurrentWeather, Location},
     Result, Settings, PROGRAM_NAME,
 };
 
@@ -258,17 +257,4 @@ pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
     } else {
         return None;
     }
-}
-
-pub(crate) async fn search_location(name: &str, lang: &str) -> Result<Vec<Location>> {
-    let params = [
-        ("name", name),
-        ("language", lang),
-        ("count", "10"),
-        ("format", "json"),
-    ];
-    let url = Url::parse_with_params("https://geocoding-api.open-meteo.com/v1/search", &params)
-        .map_err(|e| Error::other(e))?;
-    let response = reqwest::get(url).await?.json::<Results>().await?;
-    Ok(response.results)
 }
