@@ -5,7 +5,6 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     AutoLaunch(Box<dyn std::error::Error>),
-    Instant,
     Io(std::io::Error),
     NoSettings,
     Other(Box<dyn std::error::Error>),
@@ -27,7 +26,6 @@ impl Display for Error {
 
         match self {
             AutoLaunch(err) => write!(f, "AutoLaunchError: {}", err),
-            Instant => write!(f, "Time calculation failed."),
             Io(io_error) => write!(f, "{io_error}"),
             NoSettings => write!(f, "No Settings were provided."),
             Other(err) => write!(f, "Other error: {}", err),
