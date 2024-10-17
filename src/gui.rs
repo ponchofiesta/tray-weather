@@ -43,7 +43,10 @@ impl WeatherTrayIcon {
     pub fn new(menu: Menu) -> Result<Self> {
         debug!("Building tray menu");
         Ok(WeatherTrayIcon {
-            tray_icon: TrayIconBuilder::new().with_menu(Box::new(menu)).build()?,
+            tray_icon: TrayIconBuilder::new()
+                .with_menu(Box::new(menu))
+                .with_menu_on_left_click(false)
+                .build()?,
         })
     }
 

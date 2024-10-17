@@ -15,7 +15,10 @@ use gui::show_settings_window;
 use log::{debug, trace};
 use rust_i18n::t;
 use settings::Settings;
-use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::{
+    menu::{Menu, MenuEvent, MenuItem},
+    MouseButton, MouseButtonState, TrayIconEvent,
+};
 
 pub const PROGRAM_NAME: &str = "Tray Weather";
 
@@ -32,6 +35,7 @@ fn localization() {
 enum Message {
     Timer,
     Menu(MenuEvent),
+    Tray(TrayIconEvent),
 }
 
 #[tokio::main]
@@ -78,6 +82,17 @@ async fn main() -> Result<()> {
         })
     });
 
+    // Proxy for tray events
+    let tray_tx = tx.clone();
+    tokio::spawn(async move {
+        loop {
+            if let Ok(msg) = TrayIconEvent::receiver().recv() {
+                println!("tray event");
+                let _ = tray_tx.send(Message::Tray(msg)).await;
+            }
+        }
+    });
+
     // Proxy for menu events
     let menu_tx = tx.clone();
     tokio::spawn(async move {
@@ -113,8 +128,19 @@ async fn main() -> Result<()> {
                         }
                     }
 
+                    // Tray icon was clicked
+                    Message::Tray(TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    }) => {
+                        trace!("tray menu left clicked");
+                    }
+
                     // The timer ticked
                     Message::Timer => app.update_weather().await.unwrap(),
+
+                    _ => (),
                 }
             }
         }
