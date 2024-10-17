@@ -41,9 +41,7 @@ async fn main() -> Result<()> {
 
     // Load app settings
     let mut settings = Settings::default();
-    if settings.exists() {
-        settings.load()?;
-    } else {
+    if let Err(_) = settings.load() {
         settings = show_settings_window(&settings).ok_or(Error::NoSettings)?;
         settings.save()?;
     }

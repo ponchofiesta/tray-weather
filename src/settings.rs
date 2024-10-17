@@ -1,12 +1,13 @@
 use std::{fs, path::PathBuf};
 
-use crate::{weather::Location, Result};
+use crate::{gui::IconTheme, weather::Location, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Settings {
     pub location: Location,
+    pub icon_theme: IconTheme,
     #[serde(default)]
     pub autorun_enabled: bool,
 }
@@ -15,6 +16,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             location: Default::default(),
+            icon_theme: IconTheme::Metno,
             autorun_enabled: false,
         }
     }
@@ -32,10 +34,6 @@ impl Settings {
         } else {
             panic!("Failed to get settings directory.");
         }
-    }
-
-    pub fn exists(&self) -> bool {
-        self.get_path().exists()
     }
 
     pub fn load(&mut self) -> Result<()> {

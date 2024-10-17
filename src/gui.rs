@@ -1,14 +1,39 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use eframe::egui::{self, Checkbox, TextEdit, Ui};
+use eframe::egui::{self, Checkbox, ComboBox, TextEdit, Ui};
 use log::debug;
 use rust_i18n::t;
-use tray_icon::{menu::Menu, Icon, TrayIcon, TrayIconBuilder};
+use serde::{Deserialize, Serialize};
+use std::slice::Iter;
+use tray_icon::{menu::Menu, TrayIcon, TrayIconBuilder};
 
 use crate::{
     weather::{get_icon, search_location, CurrentWeather, Location},
     Result, Settings, PROGRAM_NAME,
 };
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum IconTheme {
+    Metno,
+    Monochrome,
+}
+
+impl ToString for IconTheme {
+    fn to_string(&self) -> String {
+        match self {
+            IconTheme::Metno => String::from("metno"),
+            IconTheme::Monochrome => String::from("monochrome"),
+        }
+    }
+}
+
+impl IconTheme {
+    pub fn iterator() -> Iter<'static, IconTheme> {
+        use IconTheme::*;
+        static ICON_THEMES: [IconTheme; 2] = [Metno, Monochrome];
+        ICON_THEMES.iter()
+    }
+}
 
 pub(crate) struct WeatherTrayIcon {
     pub tray_icon: TrayIcon,
@@ -22,9 +47,18 @@ impl WeatherTrayIcon {
         })
     }
 
-    pub fn set_weather(&self, location: &Location, weather: &CurrentWeather) -> Result<()> {
+    pub fn set_weather(
+        &self,
+        location: &Location,
+        icon_theme: &IconTheme,
+        weather: &CurrentWeather,
+    ) -> Result<()> {
         debug!("Set weather: {:?}", &weather);
-        let icon_path = format!("weathericons/ico/{}.ico", weather.icon_name());
+        let icon_path = format!(
+            "weathericons/{}/ico/{}.ico",
+            icon_theme.to_string(),
+            weather.icon_name()
+        );
         let icon = get_icon(&icon_path)?;
         self.tray_icon.set_icon(Some(icon))?;
         self.tray_icon.set_tooltip(Some(format!(
@@ -57,6 +91,7 @@ pub(crate) struct SettingsWindow {
     location: Location,
     location_name: String,
     found_locations: Option<Vec<Location>>,
+    icon_theme: IconTheme,
     autorun_enabled: bool,
     screen: SettingsScreen,
 }
@@ -71,6 +106,7 @@ impl Default for SettingsWindow {
             location: Default::default(),
             location_name: "".into(),
             found_locations: None,
+            icon_theme: IconTheme::Monochrome,
             autorun_enabled: false,
             screen: SettingsScreen::Home,
         }
@@ -82,6 +118,7 @@ impl SettingsWindow {
         SettingsWindow {
             tx_window: Some(tx),
             location: settings.location.clone(),
+            icon_theme: settings.icon_theme.clone(),
             autorun_enabled: settings.autorun_enabled,
             screen: SettingsScreen::Home,
             ..Default::default()
@@ -113,6 +150,17 @@ impl SettingsWindow {
             }
         });
 
+        setting_entry(ui, t!("icon_theme"), |ui| {
+            ComboBox::from_id_source("icon_theme")
+                .selected_text(&self.icon_theme.to_string())
+                .show_ui(ui, |ui| {
+                    IconTheme::iterator().cloned().for_each(|icon_theme| {
+                        let text = icon_theme.to_string();
+                        ui.selectable_value(&mut self.icon_theme, icon_theme, text);
+                    });
+                });
+        });
+
         setting_entry(ui, t!("autostart", name = PROGRAM_NAME), |ui| {
             ui.add(Checkbox::without_text(&mut self.autorun_enabled));
         });
@@ -127,6 +175,7 @@ impl SettingsWindow {
                     if let Some(tx) = &self.tx_window {
                         let settings = Settings {
                             location: self.location.clone(),
+                            icon_theme: self.icon_theme.clone(),
                             autorun_enabled: self.autorun_enabled,
                         };
                         tx.send(Some(settings)).unwrap();

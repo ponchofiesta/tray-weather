@@ -22,9 +22,11 @@ impl WeatherApp {
         debug!("update_weather()");
         let weather = get_weather(&self.settings.location).await;
         match weather {
-            Ok(weather) => self
-                .tray_icon
-                .set_weather(&self.settings.location, &weather)?,
+            Ok(weather) => self.tray_icon.set_weather(
+                &self.settings.location,
+                &self.settings.icon_theme,
+                &weather,
+            )?,
             Err(err) => self.tray_icon.set_error(&format!("Fehler: {}", err))?,
         };
         Ok(())
