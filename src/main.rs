@@ -15,7 +15,10 @@ use gui::show_settings_window;
 use log::{debug, trace};
 use rust_i18n::t;
 use settings::Settings;
-use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::{
+    menu::{Menu, MenuEvent, MenuItem},
+    MouseButton, MouseButtonState, TrayIconEvent,
+};
 
 pub const PROGRAM_NAME: &str = "Tray Weather";
 
@@ -32,6 +35,7 @@ fn localization() {
 enum Message {
     Timer,
     Menu(MenuEvent),
+    Tray(TrayIconEvent),
 }
 
 #[tokio::main]
@@ -59,34 +63,45 @@ async fn main() -> Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
     let mut task_guard = TaskGuard::new();
 
-    // Ticker for update interval
-    let timer_tx = tx.clone();
-    task_guard.spawn(|notify| {
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = notify.notified() => {
-                        trace!("Timer task notified. Exiting...");
-                        break;
-                    }
-                    _ = tokio::time::sleep(Duration::from_secs(UPDATE_INTERVAL)) => {
-                        trace!("Timer task sleeped. Ticking...");
-                        let _ = timer_tx.send(Message::Timer).await;
-                    }
-                }
-            }
-        })
-    });
+    // // Ticker for update interval
+    // let timer_tx = tx.clone();
+    // task_guard.spawn(|notify| {
+    //     tokio::spawn(async move {
+    //         loop {
+    //             tokio::select! {
+    //                 _ = notify.notified() => {
+    //                     trace!("Timer task notified. Exiting...");
+    //                     break;
+    //                 }
+    //                 _ = tokio::time::sleep(Duration::from_secs(UPDATE_INTERVAL)) => {
+    //                     trace!("Timer task sleeped. Ticking...");
+    //                     let _ = timer_tx.send(Message::Timer).await;
+    //                 }
+    //             }
+    //         }
+    //     })
+    // });
 
-    // Proxy for menu events
-    let menu_tx = tx.clone();
+    // Proxy for tray events
+    let tray_tx = tx.clone();
     tokio::spawn(async move {
         loop {
-            if let Ok(msg) = MenuEvent::receiver().recv() {
-                let _ = menu_tx.send(Message::Menu(msg)).await;
+            if let Ok(msg) = TrayIconEvent::receiver().recv() {
+                println!("tray event");
+                let _ = tray_tx.send(Message::Tray(msg)).await;
             }
         }
     });
+
+    // // Proxy for menu events
+    // let menu_tx = tx.clone();
+    // tokio::spawn(async move {
+    //     loop {
+    //         if let Ok(msg) = MenuEvent::receiver().recv() {
+    //             let _ = menu_tx.send(Message::Menu(msg)).await;
+    //         }
+    //     }
+    // });
 
     // Initial weather update
     app.update_weather().await?;
@@ -113,8 +128,19 @@ async fn main() -> Result<()> {
                         }
                     }
 
+                    // Tray icon was clicked
+                    Message::Tray(TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    }) => {
+                        show_settings_window(&app.settings);
+                    },
+
                     // The timer ticked
                     Message::Timer => app.update_weather().await.unwrap(),
+
+                    _ => (),
                 }
             }
         }
