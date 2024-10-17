@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use auto_launch::AutoLaunch;
 use log::debug;
+use tokio::sync::Notify;
 use tray_icon::menu::Menu;
 
 use crate::{error::Result, gui::WeatherTrayIcon, settings::Settings, weather::get_weather};
@@ -49,5 +52,40 @@ impl WeatherApp {
             auto.disable()?;
         }
         Ok(())
+    }
+}
+
+pub struct TaskGuard {
+    notify: Arc<Notify>,
+    handles: Vec<tokio::task::JoinHandle<()>>,
+}
+
+impl TaskGuard {
+    pub fn new() -> Self {
+        Self {
+            notify: Arc::new(Notify::new()),
+            handles: vec![],
+        }
+    }
+
+    pub fn spawn<F>(&mut self, f: F)
+    where
+        F: FnOnce(Arc<Notify>) -> tokio::task::JoinHandle<()> + Send + 'static,
+    {
+        let notify = Arc::clone(&self.notify);
+        let handle = f(notify);
+        self.handles.push(handle);
+    }
+}
+
+impl Drop for TaskGuard {
+    fn drop(&mut self) {
+        // Benachrichtige alle Tasks, dass sie stoppen sollen
+        self.notify.notify_waiters();
+
+        // Warte auf das Beenden der Tasks
+        for handle in self.handles.drain(..) {
+            let _ = tokio::runtime::Handle::current().block_on(handle);
+        }
     }
 }

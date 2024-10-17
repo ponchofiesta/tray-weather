@@ -8,7 +8,7 @@ mod weather;
 
 use std::time::Duration;
 
-use app::WeatherApp;
+use app::{TaskGuard, WeatherApp};
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
 use gui::show_settings_window;
@@ -57,14 +57,25 @@ async fn main() -> Result<()> {
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+    let mut task_guard = TaskGuard::new();
 
     // Ticker for update interval
     let timer_tx = tx.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(UPDATE_INTERVAL)).await;
-            let _ = timer_tx.send(Message::Timer).await;
-        }
+    task_guard.spawn(|notify| {
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = notify.notified() => {
+                        trace!("Timer task notified. Exiting...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(Duration::from_secs(UPDATE_INTERVAL)) => {
+                        trace!("Timer task sleeped. Ticking...");
+                        let _ = timer_tx.send(Message::Timer).await;
+                    }
+                }
+            }
+        })
     });
 
     // Proxy for menu events
