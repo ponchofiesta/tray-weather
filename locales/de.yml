@@ -7,6 +7,7 @@ location_heading: Ort suchen
 new_location: Ort suchen
 search_location: Ort suchen
 empty_location: Kein Ort. Wähle einen!
+icon_theme: Symbol-Design
 autostart: "%{name} automatisch starten"
 
 update: Wetter aktualisieren
