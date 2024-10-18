@@ -1,86 +1,15 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use eframe::egui::{self, Checkbox, ComboBox, TextEdit, Ui};
-use log::debug;
 use rust_i18n::t;
-use serde::{Deserialize, Serialize};
-use std::slice::Iter;
-use tray_icon::{menu::Menu, TrayIcon, TrayIconBuilder};
 
 use crate::{
-    weather::{get_icon, search_location, CurrentWeather, Location},
-    Result, Settings, PROGRAM_NAME,
+    settings::Settings,
+    weather::{search_location, Location},
+    Result, PROGRAM_NAME,
 };
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum IconTheme {
-    Metno,
-    Monochrome,
-}
-
-impl ToString for IconTheme {
-    fn to_string(&self) -> String {
-        match self {
-            IconTheme::Metno => String::from("metno"),
-            IconTheme::Monochrome => String::from("monochrome"),
-        }
-    }
-}
-
-impl IconTheme {
-    pub fn iterator() -> Iter<'static, IconTheme> {
-        use IconTheme::*;
-        static ICON_THEMES: [IconTheme; 2] = [Metno, Monochrome];
-        ICON_THEMES.iter()
-    }
-}
-
-pub(crate) struct WeatherTrayIcon {
-    pub tray_icon: TrayIcon,
-}
-
-impl WeatherTrayIcon {
-    pub fn new(menu: Menu) -> Result<Self> {
-        debug!("Building tray menu");
-        Ok(WeatherTrayIcon {
-            tray_icon: TrayIconBuilder::new()
-                .with_menu(Box::new(menu))
-                .with_menu_on_left_click(false)
-                .build()?,
-        })
-    }
-
-    pub fn set_weather(
-        &self,
-        location: &Location,
-        icon_theme: &IconTheme,
-        weather: &CurrentWeather,
-    ) -> Result<()> {
-        debug!("Set weather: {:?}", &weather);
-        let icon_path = format!(
-            "weathericons/{}/ico/{}.ico",
-            icon_theme.to_string(),
-            weather.icon_name()
-        );
-        let icon = get_icon(&icon_path)?;
-        self.tray_icon.set_icon(Some(icon))?;
-        self.tray_icon.set_tooltip(Some(format!(
-            "{}: {} - {}",
-            location.name,
-            weather.temperature,
-            weather.description()
-        )))?;
-        Ok(())
-    }
-
-    pub fn set_error(&self, msg: &str) -> Result<()> {
-        debug!("Set error: {}", msg);
-        self.tray_icon.set_tooltip(Some(msg))?;
-        let icon = get_icon("tabler-icons/exclamation-circle.ico")?;
-        self.tray_icon.set_icon(Some(icon))?;
-        Ok(())
-    }
-}
+use super::IconTheme;
 
 enum SettingsScreen {
     Home,

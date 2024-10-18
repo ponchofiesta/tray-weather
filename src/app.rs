@@ -5,7 +5,10 @@ use log::debug;
 use tokio::sync::Notify;
 use tray_icon::menu::Menu;
 
-use crate::{error::Result, gui::WeatherTrayIcon, settings::Settings, weather::get_weather};
+use crate::{
+    error::Result, gui::weather_tray_icon::WeatherTrayIcon, settings::Settings,
+    weather::get_weather,
+};
 
 pub(crate) struct WeatherApp {
     pub settings: Settings,
