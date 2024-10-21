@@ -1,13 +1,13 @@
 use std::{borrow::Cow, fmt::Display};
 
 use crate::error::{Error, Result};
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use image::load_from_memory_with_format;
 use log::debug;
 use reqwest::Url;
 use rust_embed::Embed;
 use rust_i18n::t;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tray_icon::Icon;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -83,35 +83,38 @@ pub(crate) struct WeatherResponse {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Current {
+    #[serde(deserialize_with = "deserialize_datetime")]
+    pub time: NaiveDateTime,
     pub temperature_2m: f32,
-    pub windspeed: f32,
-    pub winddirection: u16,
-    pub is_day: bool,
-    pub weathercode: u16,
+    pub precipitation: f32,
+    pub wind_speed_10m: f32,
+    pub wind_direction_10m: u16,
+    pub wind_gusts_10m: f32,
+    pub weather_code: u16,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Hourly {
+    #[serde(deserialize_with = "deserialize_datetime_vec")]
     pub time: Vec<NaiveDateTime>,
     pub temperature_2m: Vec<f32>,
-    pub rain: Vec<f32>,
-    pub showers: Vec<f32>,
-    pub snowfall: Vec<f32>,
+    pub precipitation: Vec<f32>,
     pub wind_speed_10m: Vec<f32>,
     pub wind_direction_10m: Vec<u16>,
+    pub wind_gusts_10m: Vec<f32>,
     pub weather_code: Vec<u16>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Daily {
-    pub time: Vec<NaiveDateTime>,
+    #[serde(deserialize_with = "deserialize_date_vec")]
+    pub time: Vec<NaiveDate>,
     pub temperature_2m_max: Vec<f32>,
     pub temperature_2m_min: Vec<f32>,
     pub precipitation_sum: Vec<f32>,
     pub wind_speed_10m_max: Vec<f32>,
-    pub wind_gusts_10m_max: Vec<u16>,
+    pub wind_gusts_10m_max: Vec<f32>,
     pub wind_direction_10m_dominant: Vec<u16>,
-    pub is_day: Vec<bool>,
     pub weather_code: Vec<u16>,
 }
 
@@ -121,9 +124,61 @@ pub(crate) struct CurrentWeather {
     pub temperature: f32,
     pub windspeed: f32,
     pub winddirection: u16,
-    pub is_day: bool,
     pub weathercode: u16,
 }
+
+// Funktion zum Deserialisieren einer Liste von NaiveDateTime-Werten
+fn deserialize_date<'de, D>(deserializer: D) -> core::result::Result<NaiveDate, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let time: String = Deserialize::deserialize(deserializer)?;
+    parse_date::<'de, D>(time)
+}
+
+// Funktion zum Deserialisieren einer Liste von NaiveDateTime-Werten
+fn deserialize_datetime<'de, D>(deserializer: D) -> core::result::Result<NaiveDateTime, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let time: String = Deserialize::deserialize(deserializer)?;
+    parse_datetime::<'de, D>(time)
+}
+
+// Funktion zum Deserialisieren einer Liste von NaiveDate-Werten
+fn deserialize_date_vec<'de, D>(deserializer: D) -> core::result::Result<Vec<NaiveDate>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Vec<String> = Vec::deserialize(deserializer)?;
+    s.into_iter()
+        .map(parse_date::<'de, D>)
+        .collect()
+}
+
+// Funktion zum Deserialisieren einer Liste von NaiveDateTime-Werten
+fn deserialize_datetime_vec<'de, D>(deserializer: D) -> core::result::Result<Vec<NaiveDateTime>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Vec<String> = Vec::deserialize(deserializer)?;
+    s.into_iter()
+        .map(parse_datetime::<'de, D>)
+        .collect()
+}
+
+fn parse_date<'de, D>(s: String) -> core::result::Result<NaiveDate, D::Error>
+where D: Deserializer<'de>,
+ {
+    NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)
+}
+
+fn parse_datetime<'de, D>(s: String) -> core::result::Result<NaiveDateTime, D::Error>
+where D: Deserializer<'de>,
+ {
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M").map_err(serde::de::Error::custom)
+}
+
 
 impl CurrentWeather {
     /// Get a description string for Open Meteo weather code
@@ -211,7 +266,7 @@ pub(crate) async fn search_location(name: &str, lang: &str) -> Result<Vec<Locati
 }
 
 /// Get current weather on Open Meteo for specific [Location]
-pub async fn get_weather(location: &Location) -> Result<CurrentWeather> {
+pub async fn get_current_weather(location: &Location) -> Result<CurrentWeather> {
     debug!("get_weather({location:?})");
     let params = [
         ("latitude", location.latitude.to_string()),
@@ -233,11 +288,10 @@ pub async fn get_forecast(location: &Location) -> Result<WeatherResponse> {
     let params = [
         ("latitude", location.latitude.to_string()),
         ("longitude", location.longitude.to_string()),
-        ("current", "temperature_2m,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m".into()),
-        ("hourly", "temperature_2m,weather_code".into()),
-        ("daily", "weather_code,temperature_2m_max,temperature_2m_min".into()),
-        ("daily", "weather_code,temperature_2m_max,temperature_2m_min".into()),
-        ("timezone", "Europe%2FBerlin".into()),
+        ("current", "temperature_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m".into()),
+        ("hourly", "temperature_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m".into()),
+        ("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant".into()),
+        // ("timezone", "Europe%2FBerlin".into()),
         ("forecast_days", "7".into()),
         ("forecast_hours", "12".into()),
     ];
@@ -272,7 +326,7 @@ mod tests {
 {
     "latitude": 52.52,
     "longitude": 13.419998,
-    "generationtime_ms": 0.1569986343383789,
+    "generationtime_ms": 0.26595592498779297,
     "utc_offset_seconds": 0,
     "timezone": "GMT",
     "timezone_abbreviation": "GMT",
@@ -288,14 +342,14 @@ mod tests {
         "wind_gusts_10m": "km/h"
     },
     "current": {
-        "time": "2024-10-21T13:30",
+        "time": "2024-10-21T17:15",
         "interval": 900,
-        "temperature_2m": 18.4,
+        "temperature_2m": 17,
         "precipitation": 0,
         "weather_code": 3,
-        "wind_speed_10m": 7.2,
-        "wind_direction_10m": 217,
-        "wind_gusts_10m": 19.8
+        "wind_speed_10m": 5.8,
+        "wind_direction_10m": 180,
+        "wind_gusts_10m": 13.3
     },
     "hourly_units": {
         "time": "iso8601",
@@ -308,10 +362,10 @@ mod tests {
     },
     "hourly": {
         "time": [
-            "2024-10-21T13:00"
+            "2024-10-21T17:00"
         ],
         "temperature_2m": [
-            18.3
+            17
         ],
         "precipitation": [
             0
@@ -320,13 +374,13 @@ mod tests {
             3
         ],
         "wind_speed_10m": [
-            8.1
+            5.8
         ],
         "wind_direction_10m": [
-            212
+            180
         ],
         "wind_gusts_10m": [
-            19.8
+            13.3
         ]
     },
     "daily_units": {
@@ -336,6 +390,7 @@ mod tests {
         "temperature_2m_min": "°C",
         "precipitation_sum": "mm",
         "precipitation_hours": "h",
+        "precipitation_probability_max": "%",
         "wind_speed_10m_max": "km/h",
         "wind_gusts_10m_max": "km/h",
         "wind_direction_10m_dominant": "°"
@@ -348,7 +403,7 @@ mod tests {
             61
         ],
         "temperature_2m_max": [
-            18.3
+            18.5
         ],
         "temperature_2m_min": [
             13.7
@@ -358,6 +413,9 @@ mod tests {
         ],
         "precipitation_hours": [
             3
+        ],
+        "precipitation_probability_max": [
+            60
         ],
         "wind_speed_10m_max": [
             10.1
@@ -375,7 +433,6 @@ mod tests {
     #[test]
     fn it_works() {
         let result: Result<WeatherResponse, serde_json::Error> = serde_json::from_str(FORECAST);
-        println!("{result:?}");
         assert!(matches!(result, Ok(_)));
     }
 }
