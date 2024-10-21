@@ -1,6 +1,7 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Display};
 
 use crate::error::{Error, Result};
+use chrono::NaiveDateTime;
 use image::load_from_memory_with_format;
 use log::debug;
 use reqwest::Url;
@@ -56,17 +57,72 @@ pub(crate) struct Results {
     pub results: Vec<Location>,
 }
 
+pub(crate) type WeatherResult = core::result::Result<WeatherResponse, WeatherError>;
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct WeatherError {
+    pub error: bool,
+    pub reason: String,
+}
+
+impl std::error::Error for WeatherError {}
+
+impl Display for WeatherError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WeatherError: {}", self.reason)
+    }
+}
+
 /// Representation for OpenMeteo REST weather response object
 #[derive(Deserialize, Debug)]
 pub(crate) struct WeatherResponse {
-    pub current_weather: CurrentWeather,
+    pub current_weather: Option<CurrentWeather>,
+    pub current: Option<Current>,
+    pub hourly: Option<Hourly>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Current {
+    pub temperature_2m: f32,
+    pub windspeed: f32,
+    pub winddirection: u16,
+    pub is_day: bool,
+    pub weathercode: u16,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Hourly {
+    pub time: Vec<NaiveDateTime>,
+    pub temperature_2m: Vec<f32>,
+    pub rain: Vec<f32>,
+    pub showers: Vec<f32>,
+    pub snowfall: Vec<f32>,
+    pub wind_speed_10m: Vec<f32>,
+    pub wind_direction_10m: Vec<u16>,
+    pub weather_code: Vec<u16>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Daily {
+    pub time: Vec<NaiveDateTime>,
+    pub temperature_2m_max: Vec<f32>,
+    pub temperature_2m_min: Vec<f32>,
+    pub precipitation_sum: Vec<f32>,
+    pub wind_speed_10m_max: Vec<f32>,
+    pub wind_gusts_10m_max: Vec<u16>,
+    pub wind_direction_10m_dominant: Vec<u16>,
+    pub is_day: Vec<bool>,
+    pub weather_code: Vec<u16>,
 }
 
 /// Representation for OpenMeteo REST current_weather object
 #[derive(Deserialize, Debug)]
 pub(crate) struct CurrentWeather {
-    pub temperature: f64,
-    pub weathercode: i32,
+    pub temperature: f32,
+    pub windspeed: f32,
+    pub winddirection: u16,
+    pub is_day: bool,
+    pub weathercode: u16,
 }
 
 impl CurrentWeather {
@@ -156,7 +212,7 @@ pub(crate) async fn search_location(name: &str, lang: &str) -> Result<Vec<Locati
 
 /// Get current weather on Open Meteo for specific [Location]
 pub async fn get_weather(location: &Location) -> Result<CurrentWeather> {
-    debug!("get_weather()");
+    debug!("get_weather({location:?})");
     let params = [
         ("latitude", location.latitude.to_string()),
         ("longitude", location.longitude.to_string()),
@@ -164,8 +220,31 @@ pub async fn get_weather(location: &Location) -> Result<CurrentWeather> {
     ];
     let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
         .map_err(|e| Error::other(e))?;
+    let response = reqwest::get(url).await?.json::<WeatherResult>().await??;
+    match response.current_weather {
+        Some(current_weather) => Ok(current_weather),
+        None => Err(Error::other("No current_weather received.")),
+    }
+}
+
+/// Get forecast weather on Open Meteo for specific [Location]
+pub async fn get_forecast(location: &Location) -> Result<WeatherResponse> {
+    debug!("get_forecast({location:?})");
+    let params = [
+        ("latitude", location.latitude.to_string()),
+        ("longitude", location.longitude.to_string()),
+        ("current", "temperature_2m,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m".into()),
+        ("hourly", "temperature_2m,weather_code".into()),
+        ("daily", "weather_code,temperature_2m_max,temperature_2m_min".into()),
+        ("daily", "weather_code,temperature_2m_max,temperature_2m_min".into()),
+        ("timezone", "Europe%2FBerlin".into()),
+        ("forecast_days", "7".into()),
+        ("forecast_hours", "12".into()),
+    ];
+    let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
+        .map_err(|e| Error::other(e))?;
     let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
-    Ok(response.current_weather)
+    Ok(response)
 }
 
 #[derive(Embed)]
@@ -183,4 +262,120 @@ pub fn get_icon(path: &str) -> Result<Icon> {
     let raw = rgba.into_raw();
     let icon = Icon::from_rgba(raw, img.width(), img.height()).map_err(Error::other)?;
     Ok(icon)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::weather::WeatherResponse;
+
+    const FORECAST: &str = r#"
+{
+    "latitude": 52.52,
+    "longitude": 13.419998,
+    "generationtime_ms": 0.1569986343383789,
+    "utc_offset_seconds": 0,
+    "timezone": "GMT",
+    "timezone_abbreviation": "GMT",
+    "elevation": 38,
+    "current_units": {
+        "time": "iso8601",
+        "interval": "seconds",
+        "temperature_2m": "°C",
+        "precipitation": "mm",
+        "weather_code": "wmo code",
+        "wind_speed_10m": "km/h",
+        "wind_direction_10m": "°",
+        "wind_gusts_10m": "km/h"
+    },
+    "current": {
+        "time": "2024-10-21T13:30",
+        "interval": 900,
+        "temperature_2m": 18.4,
+        "precipitation": 0,
+        "weather_code": 3,
+        "wind_speed_10m": 7.2,
+        "wind_direction_10m": 217,
+        "wind_gusts_10m": 19.8
+    },
+    "hourly_units": {
+        "time": "iso8601",
+        "temperature_2m": "°C",
+        "precipitation": "mm",
+        "weather_code": "wmo code",
+        "wind_speed_10m": "km/h",
+        "wind_direction_10m": "°",
+        "wind_gusts_10m": "km/h"
+    },
+    "hourly": {
+        "time": [
+            "2024-10-21T13:00"
+        ],
+        "temperature_2m": [
+            18.3
+        ],
+        "precipitation": [
+            0
+        ],
+        "weather_code": [
+            3
+        ],
+        "wind_speed_10m": [
+            8.1
+        ],
+        "wind_direction_10m": [
+            212
+        ],
+        "wind_gusts_10m": [
+            19.8
+        ]
+    },
+    "daily_units": {
+        "time": "iso8601",
+        "weather_code": "wmo code",
+        "temperature_2m_max": "°C",
+        "temperature_2m_min": "°C",
+        "precipitation_sum": "mm",
+        "precipitation_hours": "h",
+        "wind_speed_10m_max": "km/h",
+        "wind_gusts_10m_max": "km/h",
+        "wind_direction_10m_dominant": "°"
+    },
+    "daily": {
+        "time": [
+            "2024-10-21"
+        ],
+        "weather_code": [
+            61
+        ],
+        "temperature_2m_max": [
+            18.3
+        ],
+        "temperature_2m_min": [
+            13.7
+        ],
+        "precipitation_sum": [
+            0.6
+        ],
+        "precipitation_hours": [
+            3
+        ],
+        "wind_speed_10m_max": [
+            10.1
+        ],
+        "wind_gusts_10m_max": [
+            23.4
+        ],
+        "wind_direction_10m_dominant": [
+            195
+        ]
+    }
+}
+    "#;
+
+    #[test]
+    fn it_works() {
+        let result: Result<WeatherResponse, serde_json::Error> = serde_json::from_str(FORECAST);
+        println!("{result:?}");
+        assert!(matches!(result, Ok(_)));
+    }
 }

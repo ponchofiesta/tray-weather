@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::weather::WeatherError;
+
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -13,6 +15,7 @@ pub enum Error {
     TomlSer(toml::ser::Error),
     TrayIcon(tray_icon::Error),
     TrayIconMenu(tray_icon::menu::Error),
+    Weather(WeatherError),
 }
 
 unsafe impl Sync for Error {}
@@ -34,6 +37,7 @@ impl Display for Error {
             TomlSer(err) => write!(f, "TomlSerError: {}", err),
             TrayIcon(err) => write!(f, "TrayIconError: {}", err),
             TrayIconMenu(err) => write!(f, "TrayIconMenuError: {}", err),
+            Weather(err) => write!(f, "WeatherError: {}", err),
         }
     }
 }
@@ -86,5 +90,11 @@ impl From<toml::ser::Error> for Error {
 impl From<toml::de::Error> for Error {
     fn from(value: toml::de::Error) -> Self {
         Error::TomlDe(value)
+    }
+}
+
+impl From<WeatherError> for Error {
+    fn from(value: WeatherError) -> Self {
+        Error::Weather(value)
     }
 }

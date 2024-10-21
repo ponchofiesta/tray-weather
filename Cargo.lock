@@ -853,6 +853,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono"
+version = "0.4.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
+dependencies = [
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "clipboard-win"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4527,6 +4537,7 @@ version = "0.1.0"
 dependencies = [
  "async-winit",
  "auto-launch",
+ "chrono",
  "directories",
  "eframe",
  "egui-wgpu",
