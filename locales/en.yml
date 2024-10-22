@@ -1,5 +1,9 @@
 _version: 1
 
+# Forecast window
+
+
+# Settings window
 settings_title: "%{name}: Settings"
 settings_heading: Settings
 location: Location
@@ -10,9 +14,25 @@ empty_location: No location. Choose one!
 icon_theme: Icon theme
 autostart: Start %{name} automatically
 
+# Tray menu
 update: Update weather
 settings: Settings
 quit: Quit
+
+date_format: "%a %d"
+today: Today
+tomorrow: Tomorrow
+weekday:
+  mon: Mon
+  tue: Tue
+  wed: Wed
+  thu: Thu
+  fre: Fri
+  sat: Sat
+  sun: Sun
+loading: Loading...
+max: Max
+min: Min
 
 dialog:
   save: Save

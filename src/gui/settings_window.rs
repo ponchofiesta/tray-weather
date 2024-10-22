@@ -18,8 +18,8 @@ enum SettingsScreen {
 
 pub(crate) struct SettingsWindow {
     tx_window: Option<Sender<Option<Settings>>>,
-    rx_locations: Option<Receiver<Result<Vec<Location>>>>,
-    tx_locations: Option<Sender<Result<Vec<Location>>>>,
+    rx_locations: Receiver<Result<Vec<Location>>>,
+    tx_locations: Sender<Result<Vec<Location>>>,
     location: Location,
     location_name: String,
     found_locations: Option<Vec<Location>>,
@@ -33,8 +33,8 @@ impl Default for SettingsWindow {
         let locations_channel = channel();
         Self {
             tx_window: None,
-            rx_locations: Some(locations_channel.1),
-            tx_locations: Some(locations_channel.0),
+            rx_locations: locations_channel.1,
+            tx_locations: locations_channel.0,
             location: Default::default(),
             location_name: "".into(),
             found_locations: None,
@@ -121,16 +121,13 @@ impl SettingsWindow {
     }
 
     fn location_screen(&mut self, ui: &mut Ui) {
-        match &self.rx_locations {
-            Some(rx) => match rx.try_recv() {
-                Ok(response) => match response {
-                    Ok(found_locations) => self.found_locations = Some(found_locations),
-                    Err(e) => todo!("Could not get locations: {}", e),
-                },
-                Err(_) => (),
+        match self.rx_locations.try_recv() {
+            Ok(response) => match response {
+                Ok(found_locations) => self.found_locations = Some(found_locations),
+                Err(e) => todo!("Could not get locations: {}", e),
             },
-            None => (),
-        };
+            Err(_) => (),
+        }
 
         ui.heading(t!("location_heading"));
 
@@ -146,10 +143,7 @@ impl SettingsWindow {
 
             if ui.button(t!("search_location")).clicked() {
                 let name: String = self.location_name.clone();
-                let tx = match &self.tx_locations {
-                    Some(tx) => tx.clone(),
-                    None => panic!(),
-                };
+                let tx = self.tx_locations.clone();
                 tokio::spawn(async move {
                     let results = search_location(&name, "de").await;
                     tx.send(results).unwrap();

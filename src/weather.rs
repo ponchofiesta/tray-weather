@@ -79,6 +79,7 @@ pub(crate) struct WeatherResponse {
     pub current_weather: Option<CurrentWeather>,
     pub current: Option<Current>,
     pub hourly: Option<Hourly>,
+    pub daily: Option<Daily>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -151,34 +152,33 @@ where
     D: Deserializer<'de>,
 {
     let s: Vec<String> = Vec::deserialize(deserializer)?;
-    s.into_iter()
-        .map(parse_date::<'de, D>)
-        .collect()
+    s.into_iter().map(parse_date::<'de, D>).collect()
 }
 
 // Funktion zum Deserialisieren einer Liste von NaiveDateTime-Werten
-fn deserialize_datetime_vec<'de, D>(deserializer: D) -> core::result::Result<Vec<NaiveDateTime>, D::Error>
+fn deserialize_datetime_vec<'de, D>(
+    deserializer: D,
+) -> core::result::Result<Vec<NaiveDateTime>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s: Vec<String> = Vec::deserialize(deserializer)?;
-    s.into_iter()
-        .map(parse_datetime::<'de, D>)
-        .collect()
+    s.into_iter().map(parse_datetime::<'de, D>).collect()
 }
 
 fn parse_date<'de, D>(s: String) -> core::result::Result<NaiveDate, D::Error>
-where D: Deserializer<'de>,
- {
+where
+    D: Deserializer<'de>,
+{
     NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)
 }
 
 fn parse_datetime<'de, D>(s: String) -> core::result::Result<NaiveDateTime, D::Error>
-where D: Deserializer<'de>,
- {
+where
+    D: Deserializer<'de>,
+{
     NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M").map_err(serde::de::Error::custom)
 }
-
 
 impl CurrentWeather {
     /// Get a description string for Open Meteo weather code

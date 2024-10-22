@@ -11,7 +11,7 @@ use std::time::Duration;
 use app::{TaskGuard, WeatherApp};
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
-use gui::settings_window::show_settings_window;
+use gui::{forecast_window::show_forecast_window, settings_window::show_settings_window};
 use log::{debug, trace};
 use rust_i18n::t;
 use settings::Settings;
@@ -135,6 +135,7 @@ async fn main() -> Result<()> {
                         ..
                     }) => {
                         trace!("tray menu left clicked");
+                        show_forecast_window(&app.settings);
                     }
 
                     // The timer ticked
