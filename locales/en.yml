@@ -20,6 +20,7 @@ settings: Settings
 quit: Quit
 
 date_format: "%a %d"
+hour_format: "%I %P"
 today: Today
 tomorrow: Tomorrow
 weekday:

@@ -1,6 +1,6 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use chrono::{Duration, Local, NaiveDate};
+use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Timelike};
 use eframe::egui::{self, Color32, Layout, Margin, RichText, TextBuffer, Ui};
 use log::trace;
 use rust_i18n::t;
@@ -53,7 +53,21 @@ impl Default for ForecastWindow {
     }
 }
 
-fn day(
+fn render_current(ui: &mut Ui, weathercode: u16, temperature: f32, rain: f32, wind_speed: f32) {
+    egui::Frame::none()
+        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(240, 240, 240)))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(temperature.to_string()).size(30.0));
+                ui.vertical(|ui| {
+                    ui.label(format!("{}: {}", t!("wind"), wind_speed));
+                    ui.label(format!("{}: {}", t!("rain"), rain));
+                });
+            });
+        });
+}
+
+fn render_day(
     ui: &mut Ui,
     day: &str,
     // TODO: weather icon
@@ -123,11 +137,67 @@ fn day(
         });
 }
 
-fn human_day(date: &NaiveDate) -> String {
+fn render_hour(
+    ui: &mut Ui,
+    hour: &str,
+    weather_code: u16,
+    temperature: f32,
+    precipitation: f32,
+    wind_speed_10m: f32,
+) {
+    egui::Frame::none()
+        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(240, 240, 240)))
+        .show(ui, |ui| {
+            ui.vertical(|ui| {
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .fill(Color32::from_rgb(1, 178, 235))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(hour).color(Color32::from_rgb(255, 255, 255)));
+                    });
+
+                // ui.image(weathericon);
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(temperature.to_string()).size(20.0));
+                    });
+
+                // wind dir
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(wind_speed_10m.to_string()).heading());
+                    });
+
+                // ui.image(weathericon);
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(precipitation.to_string()));
+                    });
+            });
+        });
+}
+
+fn human_hour(date: &DateTime<Local>) -> String {
+    let now = Local::now();
+    if date.date_naive() == now.date_naive() && date.hour() == now.hour() {
+        String::from(t!("now"))
+    } else {
+        // TODO: better date formatting
+        format!("{}", date.format(t!("hour_format").as_str()))
+    }
+}
+
+fn human_day(date: &DateTime<Local>) -> String {
     let today = Local::now().date_naive();
-    if date == &today {
+    if date.date_naive() == today {
         String::from(t!("today"))
-    } else if date == &(today + Duration::days(1)) {
+    } else if date.date_naive() == today + Duration::days(1) {
         String::from(t!("tomorrow"))
     } else {
         // TODO: better date formatting
@@ -168,20 +238,55 @@ impl eframe::App for ForecastWindow {
             } else {
                 if let Some(ref weather_response) = self.weather_response {
                     // ui.label(format!("{weather_response:?}"));
-                    // days forecast
-                    ui.horizontal_top(|ui| {
-                        if let Some(ref daily) = weather_response.daily {
-                            for (i, time) in daily.time.iter().enumerate() {
-                                day(
-                                    ui,
-                                    &human_day(&time),
-                                    &daily.temperature_2m_max[i].to_string(),
-                                    &daily.temperature_2m_min[i].to_string(),
-                                    &daily.wind_speed_10m_max[i].to_string(),
-                                    &daily.precipitation_sum[i].to_string(),
-                                );
-                            }
+                    ui.vertical(|ui| {
+                        // current weather
+                        if let Some(ref cur) = weather_response.current {
+                            render_current(
+                                ui,
+                                cur.weather_code,
+                                cur.temperature_2m,
+                                cur.precipitation,
+                                cur.wind_speed_10m,
+                            );
                         }
+
+                        // hourly forecast
+                        ui.horizontal_top(|ui| {
+                            if let Some(ref hourly) = weather_response.hourly {
+                                for (i, time) in hourly.time.iter().enumerate() {
+                                    render_hour(
+                                        ui,
+                                        &human_hour(&Local.from_local_datetime(&time).unwrap()),
+                                        hourly.weather_code[i],
+                                        hourly.temperature_2m[i],
+                                        hourly.precipitation[i],
+                                        hourly.wind_speed_10m[i],
+                                    );
+                                }
+                            }
+                        });
+
+                        // daily forecast
+                        ui.horizontal_top(|ui| {
+                            if let Some(ref daily) = weather_response.daily {
+                                for (i, time) in daily.time.iter().enumerate() {
+                                    render_day(
+                                        ui,
+                                        &human_day(
+                                            &Local
+                                                .from_local_datetime(
+                                                    &time.and_hms_opt(0, 0, 0).unwrap(),
+                                                )
+                                                .unwrap(),
+                                        ),
+                                        &daily.temperature_2m_max[i].to_string(),
+                                        &daily.temperature_2m_min[i].to_string(),
+                                        &daily.wind_speed_10m_max[i].to_string(),
+                                        &daily.precipitation_sum[i].to_string(),
+                                    );
+                                }
+                            }
+                        });
                     });
                 }
             }
