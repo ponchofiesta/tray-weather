@@ -1,26 +1,22 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use chrono::{Datelike, Duration, Local, NaiveDate};
-use eframe::{
-    egui::{self, Align, Color32, Layout, RichText, TextBuffer, Ui},
-    Frame,
-};
-use image::DynamicImage;
+use chrono::{Duration, Local, NaiveDate};
+use eframe::egui::{self, Color32, Layout, Margin, RichText, TextBuffer, Ui};
 use log::trace;
 use rust_i18n::t;
 
 use crate::{
-    error::Error,
-    settings::{self, Settings},
-    weather::{self, get_forecast, WeatherResponse},
+    error::{Error, Result},
+    settings::Settings,
+    weather::{get_forecast, WeatherResponse},
     PROGRAM_NAME,
 };
 
 pub(crate) struct ForecastWindow {
     pub loading: bool,
     pub settings: Settings,
-    pub rx: Receiver<Result<WeatherResponse, Error>>,
-    pub tx: Sender<Result<WeatherResponse, Error>>,
+    pub rx: Receiver<Result<WeatherResponse>>,
+    pub tx: Sender<Result<WeatherResponse>>,
     pub weather_response: Option<WeatherResponse>,
 }
 
@@ -60,41 +56,71 @@ impl Default for ForecastWindow {
 fn day(
     ui: &mut Ui,
     day: &str,
+    // TODO: weather icon
     // weathericon: &[u8],
     max: &str,
     min: &str,
     wind_speed: &str,
+    // TODO: rain icon
     // rain_icon: DynamicImage,
     rain: &str,
 ) {
-    ui.vertical(|ui| {
-        egui::Frame::none()
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(240, 240, 240)))
-            .show(ui, |ui| {
+    egui::Frame::none()
+        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(240, 240, 240)))
+        .show(ui, |ui| {
+            ui.vertical(|ui| {
                 egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
                     .fill(Color32::from_rgb(1, 178, 235))
                     .show(ui, |ui| {
                         ui.label(RichText::new(day).color(Color32::from_rgb(255, 255, 255)));
                     });
+
                 // ui.image(weathericon);
-                ui.label(RichText::new(t!("max")).size(20.0));
+
                 egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(t!("max")));
+                    });
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
                     .fill(Color32::from_rgb(64, 255, 255))
                     .show(ui, |ui| {
-                        ui.label(RichText::new(max).size(24.0));
+                        ui.label(RichText::new(max).size(20.0));
                     });
-                ui.label(t!("min"));
+
                 egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(t!("min")));
+                    });
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
                     .fill(Color32::from_rgb(242, 242, 242))
                     .show(ui, |ui| {
-                        ui.label(RichText::new(min).size(24.0));
+                        ui.label(RichText::new(min).size(16.0));
                     });
+
                 // wind dir
-                ui.label(wind_speed);
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(wind_speed).heading());
+                    });
+
                 // ui.image(rain_icon);
-                ui.label(rain);
+
+                egui::Frame::none()
+                    .inner_margin(Margin::symmetric(10.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(rain));
+                    });
             });
-    });
+        });
 }
 
 fn human_day(date: &NaiveDate) -> String {
@@ -104,6 +130,7 @@ fn human_day(date: &NaiveDate) -> String {
     } else if date == &(today + Duration::days(1)) {
         String::from(t!("tomorrow"))
     } else {
+        // TODO: better date formatting
         format!("{}", date.format(t!("date_format").as_str()))
     }
 }
@@ -112,7 +139,7 @@ impl eframe::App for ForecastWindow {
     fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
         // Styling
         let mut style: egui::Style = (*ctx.style()).clone();
-        style.spacing.item_spacing = egui::vec2(16.0, 8.0);
+        // style.spacing.item_spacing = egui::vec2(16.0, 8.0);
         ctx.set_style(style.clone());
 
         let frame = egui::Frame::none()
@@ -145,7 +172,6 @@ impl eframe::App for ForecastWindow {
                     ui.horizontal_top(|ui| {
                         if let Some(ref daily) = weather_response.daily {
                             for (i, time) in daily.time.iter().enumerate() {
-                                // TODO: localized date
                                 day(
                                     ui,
                                     &human_day(&time),
@@ -163,7 +189,7 @@ impl eframe::App for ForecastWindow {
     }
 }
 
-pub(crate) fn show_forecast_window(settings: &Settings) -> eframe::Result {
+pub(crate) fn show_forecast_window(settings: &Settings) -> Result<()> {
     let mut forecast_window = ForecastWindow::new(settings.clone());
     forecast_window.update_weather();
 
@@ -172,8 +198,9 @@ pub(crate) fn show_forecast_window(settings: &Settings) -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        &t!("settings_title", name = PROGRAM_NAME),
+        &t!("forecast_title", name = PROGRAM_NAME),
         options,
         Box::new(|_cc| Ok(Box::new(forecast_window))),
     )
+    .map_err(|e| Error::other(format!("eframe::run_native() failed: {}", e)))
 }

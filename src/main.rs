@@ -50,6 +50,9 @@ async fn main() -> Result<()> {
         settings.save()?;
     }
 
+    show_forecast_window(&settings).unwrap();
+    return Ok(());
+
     // Build tray menu
     let item_update = MenuItem::new(t!("update"), true, None);
     let item_config = MenuItem::new(t!("settings"), true, None);
@@ -133,10 +136,7 @@ async fn main() -> Result<()> {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
-                    }) => {
-                        trace!("tray menu left clicked");
-                        show_forecast_window(&app.settings);
-                    }
+                    }) => show_forecast_window(&app.settings).unwrap(),
 
                     // The timer ticked
                     Message::Timer => app.update_weather().await.unwrap(),
