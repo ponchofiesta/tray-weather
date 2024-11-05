@@ -57,8 +57,7 @@ pub(crate) struct Results {
     pub results: Vec<Location>,
 }
 
-pub(crate) type WeatherResult = core::result::Result<WeatherResponse, WeatherError>;
-
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub(crate) struct WeatherError {
     pub error: bool,
@@ -83,6 +82,7 @@ pub(crate) struct WeatherResponse {
     pub daily: Option<Daily>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub(crate) struct Current {
     #[serde(deserialize_with = "deserialize_datetime")]
@@ -95,6 +95,7 @@ pub(crate) struct Current {
     pub weather_code: u16,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub(crate) struct Hourly {
     #[serde(deserialize_with = "deserialize_datetime_vec")]
@@ -107,6 +108,7 @@ pub(crate) struct Hourly {
     pub weather_code: Vec<u16>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub(crate) struct Daily {
     #[serde(deserialize_with = "deserialize_date_vec")]
@@ -121,21 +123,13 @@ pub(crate) struct Daily {
 }
 
 /// Representation for OpenMeteo REST current_weather object
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub(crate) struct CurrentWeather {
     pub temperature: f32,
     pub windspeed: f32,
     pub winddirection: u16,
     pub weathercode: u16,
-}
-
-// Funktion zum Deserialisieren einer Liste von NaiveDateTime-Werten
-fn deserialize_date<'de, D>(deserializer: D) -> core::result::Result<NaiveDate, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let time: String = Deserialize::deserialize(deserializer)?;
-    parse_date::<'de, D>(time)
 }
 
 // Funktion zum Deserialisieren einer Liste von NaiveDateTime-Werten
@@ -329,117 +323,13 @@ pub fn get_icon(path: &str) -> Result<Icon> {
 mod tests {
     use crate::weather::WeatherResponse;
 
-    const FORECAST: &str = r#"
-{
-    "latitude": 52.52,
-    "longitude": 13.419998,
-    "generationtime_ms": 0.26595592498779297,
-    "utc_offset_seconds": 0,
-    "timezone": "GMT",
-    "timezone_abbreviation": "GMT",
-    "elevation": 38,
-    "current_units": {
-        "time": "iso8601",
-        "interval": "seconds",
-        "temperature_2m": "°C",
-        "precipitation": "mm",
-        "weather_code": "wmo code",
-        "wind_speed_10m": "km/h",
-        "wind_direction_10m": "°",
-        "wind_gusts_10m": "km/h"
-    },
-    "current": {
-        "time": "2024-10-21T17:15",
-        "interval": 900,
-        "temperature_2m": 17,
-        "precipitation": 0,
-        "weather_code": 3,
-        "wind_speed_10m": 5.8,
-        "wind_direction_10m": 180,
-        "wind_gusts_10m": 13.3
-    },
-    "hourly_units": {
-        "time": "iso8601",
-        "temperature_2m": "°C",
-        "precipitation": "mm",
-        "weather_code": "wmo code",
-        "wind_speed_10m": "km/h",
-        "wind_direction_10m": "°",
-        "wind_gusts_10m": "km/h"
-    },
-    "hourly": {
-        "time": [
-            "2024-10-21T17:00"
-        ],
-        "temperature_2m": [
-            17
-        ],
-        "precipitation": [
-            0
-        ],
-        "weather_code": [
-            3
-        ],
-        "wind_speed_10m": [
-            5.8
-        ],
-        "wind_direction_10m": [
-            180
-        ],
-        "wind_gusts_10m": [
-            13.3
-        ]
-    },
-    "daily_units": {
-        "time": "iso8601",
-        "weather_code": "wmo code",
-        "temperature_2m_max": "°C",
-        "temperature_2m_min": "°C",
-        "precipitation_sum": "mm",
-        "precipitation_hours": "h",
-        "precipitation_probability_max": "%",
-        "wind_speed_10m_max": "km/h",
-        "wind_gusts_10m_max": "km/h",
-        "wind_direction_10m_dominant": "°"
-    },
-    "daily": {
-        "time": [
-            "2024-10-21"
-        ],
-        "weather_code": [
-            61
-        ],
-        "temperature_2m_max": [
-            18.5
-        ],
-        "temperature_2m_min": [
-            13.7
-        ],
-        "precipitation_sum": [
-            0.6
-        ],
-        "precipitation_hours": [
-            3
-        ],
-        "precipitation_probability_max": [
-            60
-        ],
-        "wind_speed_10m_max": [
-            10.1
-        ],
-        "wind_gusts_10m_max": [
-            23.4
-        ],
-        "wind_direction_10m_dominant": [
-            195
-        ]
-    }
-}
-    "#;
-
     #[test]
-    fn it_works() {
-        let result: Result<WeatherResponse, serde_json::Error> = serde_json::from_str(FORECAST);
+    fn decode_weatherresponse() {
+        let result: Result<WeatherResponse, serde_json::Error> =
+            serde_json::from_str(include_str!("../tests/data/weather_response_forecast.json"));
         assert!(matches!(result, Ok(_)));
     }
+
+    #[test]
+    fn get_weather() {}
 }

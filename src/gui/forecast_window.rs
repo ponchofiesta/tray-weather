@@ -1,6 +1,6 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Timelike};
+use chrono::{DateTime, Duration, Local, TimeZone, Timelike};
 use eframe::egui::{self, Color32, Layout, Margin, RichText, TextBuffer, Ui};
 use log::trace;
 use rust_i18n::t;
@@ -53,7 +53,7 @@ impl Default for ForecastWindow {
     }
 }
 
-fn render_current(ui: &mut Ui, weathercode: u16, temperature: f32, rain: f32, wind_speed: f32) {
+fn render_current(ui: &mut Ui, _weathercode: u16, temperature: f32, rain: f32, wind_speed: f32) {
     egui::Frame::none()
         .stroke(egui::Stroke::new(1.0, Color32::from_rgb(240, 240, 240)))
         .show(ui, |ui| {
@@ -140,7 +140,7 @@ fn render_day(
 fn render_hour(
     ui: &mut Ui,
     hour: &str,
-    weather_code: u16,
+    _weather_code: u16,
     temperature: f32,
     precipitation: f32,
     wind_speed_10m: f32,
@@ -206,11 +206,11 @@ fn human_day(date: &DateTime<Local>) -> String {
 }
 
 impl eframe::App for ForecastWindow {
-    fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // Styling
-        let mut style: egui::Style = (*ctx.style()).clone();
+        let style: egui::Style = (*ctx.style()).clone();
         // style.spacing.item_spacing = egui::vec2(16.0, 8.0);
-        ctx.set_style(style.clone());
+        // ctx.set_style(style.clone());
 
         let frame = egui::Frame::none()
             .inner_margin(egui::Margin::same(16.0))
