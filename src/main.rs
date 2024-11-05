@@ -50,8 +50,8 @@ async fn main() -> Result<()> {
         settings.save()?;
     }
 
-    show_forecast_window(&settings).unwrap();
-    return Ok(());
+    // show_forecast_window(&settings).unwrap();
+    // return Ok(());
 
     // Build tray menu
     let item_update = MenuItem::new(t!("update"), true, None);

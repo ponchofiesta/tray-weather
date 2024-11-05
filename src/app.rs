@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use auto_launch::AutoLaunch;
-use log::debug;
+use log::{debug, trace};
 use tokio::sync::Notify;
 use tray_icon::menu::Menu;
 
@@ -27,6 +27,7 @@ impl WeatherApp {
     pub async fn update_weather(&self) -> Result<()> {
         debug!("update_weather()");
         let weather = get_current_weather(&self.settings.location).await;
+        trace!("{:?}", weather);
         match weather {
             Ok(weather) => self.tray_icon.set_weather(
                 &self.settings.location,

@@ -76,6 +76,7 @@ impl Display for WeatherError {
 /// Representation for OpenMeteo REST weather response object
 #[derive(Deserialize, Debug)]
 pub(crate) struct WeatherResponse {
+    pub error: Option<WeatherError>,
     pub current_weather: Option<CurrentWeather>,
     pub current: Option<Current>,
     pub hourly: Option<Hourly>,
@@ -275,7 +276,10 @@ pub async fn get_current_weather(location: &Location) -> Result<CurrentWeather> 
     ];
     let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
         .map_err(|e| Error::other(e))?;
-    let response = reqwest::get(url).await?.json::<WeatherResult>().await??;
+    let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
+    if let Some(error) = response.error {
+        return Err(Error::other(error));
+    }
     match response.current_weather {
         Some(current_weather) => Ok(current_weather),
         None => Err(Error::other("No current_weather received.")),
@@ -298,6 +302,9 @@ pub async fn get_forecast(location: &Location) -> Result<WeatherResponse> {
     let url = Url::parse_with_params("https://api.open-meteo.com/v1/forecast", &params)
         .map_err(|e| Error::other(e))?;
     let response = reqwest::get(url).await?.json::<WeatherResponse>().await?;
+    if let Some(error) = response.error {
+        return Err(Error::other(error));
+    }
     Ok(response)
 }
 
