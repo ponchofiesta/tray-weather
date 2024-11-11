@@ -1,6 +1,6 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use eframe::egui::{self, Checkbox, ComboBox, TextEdit, Ui};
+use iced::Application;
 use rust_i18n::t;
 
 use crate::{
@@ -216,10 +216,15 @@ pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
     let (tx, rx) = channel::<Option<Settings>>();
     let settings_window = SettingsWindow::new(tx.clone(), settings);
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([480.0, 320.0]),
-        ..Default::default()
-    };
+    iced::application(
+        SettingsWindow::title,
+        SettingsWindow::update,
+        SettingsWindow::view,
+    )
+    .centered()
+    .run_with(settings_window)
+    .ok()?;
+
     eframe::run_native(
         &t!("settings_title", name = PROGRAM_NAME),
         options,
