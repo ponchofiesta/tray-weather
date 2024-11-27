@@ -34,3 +34,4 @@ sys-locale = "0.3.1"
 rust-embed = { version = "8.5.0", features = ["include-exclude"] }
 image = { version = "0.25.2", default-features = false, features = ["ico"] }
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "now", "serde"] }
+tao = "0.30.8"

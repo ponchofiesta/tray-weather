@@ -9,16 +9,17 @@ mod weather;
 use std::time::Duration;
 
 use app::{TaskGuard, WeatherApp};
-use async_winit::{event_loop::EventLoop, ThreadUnsafe};
+// use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
-use gui::{forecast_window::show_forecast_window, settings_window::show_settings_window};
+// use gui::{forecast_window::show_forecast_window, settings_window::show_settings_window};
+use gui::settings_window::show_settings_window;
 use log::{debug, trace};
 use rust_i18n::t;
 use settings::Settings;
-use tray_icon::{
-    menu::{Menu, MenuEvent, MenuItem},
-    MouseButton, MouseButtonState, TrayIconEvent,
-};
+// use tray_icon::{
+//     menu::{Menu, MenuEvent, MenuItem},
+//     MouseButton, MouseButtonState, TrayIconEvent,
+// };
 
 pub const PROGRAM_NAME: &str = "Tray Weather";
 
@@ -54,13 +55,19 @@ async fn main() -> Result<()> {
     // return Ok(());
 
     // Build tray menu
-    let item_update = MenuItem::new(t!("update"), true, None);
-    let item_config = MenuItem::new(t!("settings"), true, None);
-    let item_exit = MenuItem::new(t!("quit"), true, None);
-    let menu = Menu::with_items(&[&item_update, &item_config, &item_exit])?;
+    // let item_update = MenuItem::new(t!("update"), true, None);
+    // let item_config = MenuItem::new(t!("settings"), true, None);
+    // let item_exit = MenuItem::new(t!("quit"), true, None);
+    // let menu = Menu::with_items(&[&item_update, &item_config, &item_exit])?;
+
+    let menu = tao::menu::Menu::new();
+    let item_update = tray_menu.add_item(t!("update"), true, None);
+    let item_config = tray_menu.add_item(t!("settings"), true, None);
+    let item_exit = tray_menu.add_item(t!("quit"), true, None);
 
     let mut app = WeatherApp::new(settings, menu)?;
 
+    let event_loop = EventLoop::new();
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
@@ -136,7 +143,7 @@ async fn main() -> Result<()> {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
-                    }) => show_forecast_window(&app.settings).unwrap(),
+                    }) => (), //show_forecast_window(&app.settings).unwrap(),
 
                     // The timer ticked
                     Message::Timer => app.update_weather().await.unwrap(),
