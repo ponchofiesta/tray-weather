@@ -277,7 +277,7 @@ dependencies = [
  "async-task",
  "concurrent-queue",
  "fastrand 2.1.1",
- "futures-lite 2.3.0",
+ "futures-lite 2.5.0",
  "slab",
 ]
 
@@ -323,7 +323,7 @@ dependencies = [
  "cfg-if",
  "concurrent-queue",
  "futures-io",
- "futures-lite 2.3.0",
+ "futures-lite 2.5.0",
  "parking",
  "polling 3.7.3",
  "rustix 0.38.34",
@@ -661,7 +661,7 @@ dependencies = [
  "async-channel",
  "async-task",
  "futures-io",
- "futures-lite 2.3.0",
+ "futures-lite 2.5.0",
  "piper",
 ]
 
@@ -1619,9 +1619,9 @@ dependencies = [
 
 [[package]]
 name = "futures-lite"
-version = "2.3.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52527eb5074e35e9339c6b4e8d12600c7128b68fb25dcb9fa9dec18f7c25f3a5"
+checksum = "cef40d21ae2c515b51041df9ed313ed21e572df340ea58a922a0aefe7e8891a1"
 dependencies = [
  "fastrand 2.1.1",
  "futures-core",
@@ -4366,19 +4366,7 @@ dependencies = [
  "mio 1.0.2",
  "pin-project-lite",
  "socket2 0.5.7",
- "tokio-macros",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.76",
 ]
 
 [[package]]
@@ -4575,6 +4563,7 @@ dependencies = [
  "egui-wgpu",
  "embed-resource",
  "env_logger",
+ "futures-lite 2.5.0",
  "image",
  "log",
  "reqwest",
@@ -4583,7 +4572,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sys-locale",
- "tokio",
  "toml 0.8.19",
  "tray-icon",
 ]

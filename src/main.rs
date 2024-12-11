@@ -7,11 +7,12 @@ mod settings;
 mod weather;
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::{mpsc::channel, Arc, Mutex},
+    thread::{sleep, spawn},
     time::Duration,
 };
 
-use app::{TaskGuard, WeatherApp};
+use app::WeatherApp;
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
 use error::{Error, Result};
 use gui::{forecast_window::show_forecast_window, settings_window::show_settings_window};
@@ -57,8 +58,7 @@ impl ToString for MenuId {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     env_logger::init();
     localization();
 
@@ -84,70 +84,105 @@ async fn main() -> Result<()> {
 
     let event_loop: EventLoop<ThreadUnsafe> = EventLoop::new();
     let window_target = event_loop.window_target().clone();
-    let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-    let mut task_guard = TaskGuard::new();
+    let (tx, mut rx) = channel();
+    // let mut task_guard = TaskGuard::new();
 
     let sleep_update_interval = update_interval.clone();
 
     // Ticker for update interval
     let timer_tx = tx.clone();
-    task_guard.spawn(|notify| {
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = notify.notified() => {
-                        trace!("Timer task notified. Exiting...");
-                        break;
-                    }
-                    _ = tokio::time::sleep(Duration::from_secs(*sleep_update_interval.lock().unwrap() * 60)) => {
-                        trace!("Timer task sleeped. Ticking...");
-                        let _ = timer_tx.send(Message::Update).await;
-                    }
-                }
-            }
-        })
+    spawn(move || loop {
+        sleep(Duration::from_secs(
+            *sleep_update_interval.lock().unwrap() * 60,
+        ));
+        trace!("Timer task sleeped. Ticking...");
+        let _ = timer_tx.send(Message::Update);
     });
+    // task_guard.spawn(|notify| {
+    //     spawn(async move {
+    //         loop {
+    //             tokio::select! {
+    //                 _ = notify.notified() => {
+    //                     trace!("Timer task notified. Exiting...");
+    //                     break;
+    //                 }
+    //                 _ = tokio::time::sleep(Duration::from_secs(*sleep_update_interval.lock().unwrap() * 60)) => {
+    //                     trace!("Timer task sleeped. Ticking...");
+    //                     let _ = timer_tx.send(Message::Update).await;
+    //                 }
+    //             }
+    //         }
+    //     })
+    // });
 
     // Proxy for tray events
     let tray_tx = tx.clone();
-    tokio::spawn(async move {
-        loop {
-            if let Ok(event) = TrayIconEvent::receiver().recv() {
-                println!("tray event");
-                let msg = match event {
-                    TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } => Message::ShowForecast,
-                    _ => continue,
-                };
-                let _ = tray_tx.send(msg).await;
-            }
+    spawn(move || loop {
+        if let Ok(event) = TrayIconEvent::receiver().recv() {
+            println!("tray event");
+            let msg = match event {
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => Message::ShowForecast,
+                _ => continue,
+            };
+            let _ = tray_tx.send(msg);
         }
     });
+    // tokio::spawn(async move {
+    //     loop {
+    //         if let Ok(event) = TrayIconEvent::receiver().recv() {
+    //             println!("tray event");
+    //             let msg = match event {
+    //                 TrayIconEvent::Click {
+    //                     button: MouseButton::Left,
+    //                     button_state: MouseButtonState::Up,
+    //                     ..
+    //                 } => Message::ShowForecast,
+    //                 _ => continue,
+    //             };
+    //             let _ = tray_tx.send(msg).await;
+    //         }
+    //     }
+    // });
 
     // Proxy for menu events
     let menu_tx = tx.clone();
-    tokio::spawn(async move {
-        loop {
-            if let Ok(event) = MenuEvent::receiver().recv() {
-                let msg = if event.id() == MenuId::Update.to_string() {
-                    Message::Update
-                } else if event.id() == MenuId::Settings.to_string() {
-                    Message::ShowSettings
-                } else if event.id() == MenuId::Quit.to_string() {
-                    Message::Quit
-                } else {
-                    continue;
-                };
-                let _ = menu_tx.send(msg).await;
-            }
+    spawn(move || loop {
+        if let Ok(event) = MenuEvent::receiver().recv() {
+            let msg = if event.id() == MenuId::Update.to_string() {
+                Message::Update
+            } else if event.id() == MenuId::Settings.to_string() {
+                Message::ShowSettings
+            } else if event.id() == MenuId::Quit.to_string() {
+                Message::Quit
+            } else {
+                continue;
+            };
+            let _ = menu_tx.send(msg);
         }
     });
+    // tokio::spawn(async move {
+    //     loop {
+    //         if let Ok(event) = MenuEvent::receiver().recv() {
+    //             let msg = if event.id() == MenuId::Update.to_string() {
+    //                 Message::Update
+    //             } else if event.id() == MenuId::Settings.to_string() {
+    //                 Message::ShowSettings
+    //             } else if event.id() == MenuId::Quit.to_string() {
+    //                 Message::Quit
+    //             } else {
+    //                 continue;
+    //             };
+    //             let _ = menu_tx.send(msg).await;
+    //         }
+    //     }
+    // });
 
     // Initial weather update
-    app.update_weather().await?;
+    let _ = futures_lite::future::block_on(app.update_weather());
 
     let setting_update_interval = update_interval.clone();
 
@@ -155,7 +190,7 @@ async fn main() -> Result<()> {
     event_loop.block_on(async move {
         loop {
             trace!("eventloop iteration starts");
-            if let Some(msg) = rx.recv().await {
+            if let Ok(msg) = rx.recv() {
                 match msg {
                     Message::Update => app.update_weather().await.unwrap(),
                     Message::ShowSettings => {

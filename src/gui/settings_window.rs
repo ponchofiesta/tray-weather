@@ -137,7 +137,7 @@ impl SettingsWindow {
             if ui.button(t!("search_location")).clicked() {
                 let name: String = self.location_name.clone();
                 let tx = self.tx_locations.clone();
-                tokio::spawn(async move {
+                futures_lite::future::block_on(async move {
                     let results = search_location(&name, "de").await;
                     tx.send(results).unwrap();
                 });

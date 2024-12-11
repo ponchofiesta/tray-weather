@@ -33,7 +33,7 @@ impl ForecastWindow {
         self.loading = true;
         let tx = self.tx.clone();
         let location = self.settings.location.clone();
-        tokio::spawn(async move {
+        futures_lite::future::block_on(async move {
             let forecast = get_forecast(&location).await;
             tx.send(forecast).unwrap();
         });
