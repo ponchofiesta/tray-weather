@@ -76,7 +76,7 @@ impl SettingsWindow {
             }
         });
 
-        setting_entry(ui, t!("refresh_each"), |ui| {
+        setting_entry(ui, t!("update_interval"), |ui| {
             integer_edit_field(ui, &mut self.settings.update_interval)
         });
 

@@ -11,6 +11,7 @@ location_heading: Search location
 new_location: Search location
 search_location: Search location
 empty_location: No location. Choose one!
+update_interval: Update interval (min)
 icon_theme: Icon theme
 autostart: Start %{name} automatically
 
