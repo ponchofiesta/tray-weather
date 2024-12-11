@@ -227,9 +227,5 @@ pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
     )
     .ok()?;
 
-    if let Ok(msg) = rx.try_recv() {
-        return msg;
-    } else {
-        return None;
-    }
+    rx.try_recv().ok().flatten()
 }
