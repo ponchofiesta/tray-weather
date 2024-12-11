@@ -33,9 +33,27 @@ fn localization() {
 }
 
 enum Message {
-    Timer,
-    Menu(MenuEvent),
-    Tray(TrayIconEvent),
+    Update,
+    ShowSettings,
+    ShowForecast,
+    Quit,
+}
+
+enum MenuId {
+    Update,
+    Settings,
+    Quit,
+}
+
+impl ToString for MenuId {
+    fn to_string(&self) -> String {
+        use MenuId::*;
+        String::from(match self {
+            Update => "update",
+            Settings => "settings",
+            Quit => "quit",
+        })
+    }
 }
 
 #[tokio::main]
@@ -54,9 +72,9 @@ async fn main() -> Result<()> {
     // return Ok(());
 
     // Build tray menu
-    let item_update = MenuItem::new(t!("update"), true, None);
-    let item_config = MenuItem::new(t!("settings"), true, None);
-    let item_exit = MenuItem::new(t!("quit"), true, None);
+    let item_update = MenuItem::with_id(MenuId::Update, t!("update"), true, None);
+    let item_config = MenuItem::with_id(MenuId::Settings, t!("settings"), true, None);
+    let item_exit = MenuItem::with_id(MenuId::Quit, t!("quit"), true, None);
     let menu = Menu::with_items(&[&item_update, &item_config, &item_exit])?;
 
     let mut app = WeatherApp::new(settings, menu)?;
@@ -78,7 +96,7 @@ async fn main() -> Result<()> {
                     }
                     _ = tokio::time::sleep(Duration::from_secs(UPDATE_INTERVAL)) => {
                         trace!("Timer task sleeped. Ticking...");
-                        let _ = timer_tx.send(Message::Timer).await;
+                        let _ = timer_tx.send(Message::Update).await;
                     }
                 }
             }
@@ -89,9 +107,17 @@ async fn main() -> Result<()> {
     let tray_tx = tx.clone();
     tokio::spawn(async move {
         loop {
-            if let Ok(msg) = TrayIconEvent::receiver().recv() {
+            if let Ok(event) = TrayIconEvent::receiver().recv() {
                 println!("tray event");
-                let _ = tray_tx.send(Message::Tray(msg)).await;
+                let msg = match event {
+                    TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } => Message::ShowForecast,
+                    _ => continue,
+                };
+                let _ = tray_tx.send(msg).await;
             }
         }
     });
@@ -100,8 +126,17 @@ async fn main() -> Result<()> {
     let menu_tx = tx.clone();
     tokio::spawn(async move {
         loop {
-            if let Ok(msg) = MenuEvent::receiver().recv() {
-                let _ = menu_tx.send(Message::Menu(msg)).await;
+            if let Ok(event) = MenuEvent::receiver().recv() {
+                let msg = if event.id() == MenuId::Update.to_string() {
+                    Message::Update
+                } else if event.id() == MenuId::Settings.to_string() {
+                    Message::ShowSettings
+                } else if event.id() == MenuId::Quit.to_string() {
+                    Message::Quit
+                } else {
+                    continue;
+                };
+                let _ = menu_tx.send(msg).await;
             }
         }
     });
@@ -115,33 +150,16 @@ async fn main() -> Result<()> {
             trace!("eventloop iteration starts");
             if let Some(msg) = rx.recv().await {
                 match msg {
-                    // An item of tray menu was clicked
-                    Message::Menu(menuevent) => {
-                        debug!("Menu event: {:?}", menuevent);
-                        if menuevent.id() == item_update.id() {
-                            app.update_weather().await.unwrap();
-                        } else if menuevent.id() == item_config.id() {
-                            if let Some(new_settings) = show_settings_window(&app.settings) {
-                                app.settings.update(&new_settings);
-                                app.settings.save().expect("Could not save settings.");
-                                app.update_settings().await.unwrap();
-                            }
-                        } else if menuevent.id() == item_exit.id() {
-                            window_target.exit().await;
+                    Message::Update => app.update_weather().await.unwrap(),
+                    Message::ShowSettings => {
+                        if let Some(new_settings) = show_settings_window(&app.settings) {
+                            app.settings.update(&new_settings);
+                            app.settings.save().expect("Could not save settings.");
+                            app.update_settings().await.unwrap();
                         }
                     }
-
-                    // Tray icon was clicked
-                    Message::Tray(TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    }) => show_forecast_window(&app.settings).unwrap(),
-
-                    // The timer ticked
-                    Message::Timer => app.update_weather().await.unwrap(),
-
-                    _ => (),
+                    Message::ShowForecast => show_forecast_window(&app.settings).unwrap(),
+                    Message::Quit => window_target.exit().await,
                 }
             }
         }
