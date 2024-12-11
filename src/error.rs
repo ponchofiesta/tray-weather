@@ -13,8 +13,6 @@ pub enum Error {
     Reqwest(reqwest::Error),
     TomlDe(toml::de::Error),
     TomlSer(toml::ser::Error),
-    TrayIcon(tray_icon::Error),
-    TrayIconMenu(tray_icon::menu::Error),
     Weather(WeatherError),
 }
 
@@ -35,8 +33,6 @@ impl Display for Error {
             Reqwest(err) => write!(f, "RequestError: {}", err),
             TomlDe(err) => write!(f, "TomlDeError: {}", err),
             TomlSer(err) => write!(f, "TomlSerError: {}", err),
-            TrayIcon(err) => write!(f, "TrayIconError: {}", err),
-            TrayIconMenu(err) => write!(f, "TrayIconMenuError: {}", err),
             Weather(err) => write!(f, "WeatherError: {}", err),
         }
     }
@@ -66,18 +62,6 @@ impl From<std::io::Error> for Error {
 impl From<reqwest::Error> for Error {
     fn from(value: reqwest::Error) -> Self {
         Error::Reqwest(value)
-    }
-}
-
-impl From<tray_icon::Error> for Error {
-    fn from(value: tray_icon::Error) -> Self {
-        Error::TrayIcon(value)
-    }
-}
-
-impl From<tray_icon::menu::Error> for Error {
-    fn from(value: tray_icon::menu::Error) -> Self {
-        Error::TrayIconMenu(value)
     }
 }
 

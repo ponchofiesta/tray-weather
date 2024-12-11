@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 pub mod forecast_window;
 pub mod settings_window;
-pub mod weather_tray_icon;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum IconTheme {

@@ -1,6 +1,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 use crate::error::{Error, Result};
+use betrayer::Icon;
 use chrono::{NaiveDate, NaiveDateTime};
 use image::load_from_memory_with_format;
 use log::debug;
@@ -8,7 +9,6 @@ use reqwest::Url;
 use rust_embed::Embed;
 use rust_i18n::t;
 use serde::{Deserialize, Deserializer, Serialize};
-use tray_icon::Icon;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub(crate) struct Location {
