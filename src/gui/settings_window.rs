@@ -20,11 +20,9 @@ pub(crate) struct SettingsWindow {
     tx_window: Option<Sender<Option<Settings>>>,
     rx_locations: Receiver<Result<Vec<Location>>>,
     tx_locations: Sender<Result<Vec<Location>>>,
-    location: Location,
+    settings: Settings,
     location_name: String,
     found_locations: Option<Vec<Location>>,
-    icon_theme: IconTheme,
-    autorun_enabled: bool,
     screen: SettingsScreen,
 }
 
@@ -35,11 +33,9 @@ impl Default for SettingsWindow {
             tx_window: None,
             rx_locations: locations_channel.1,
             tx_locations: locations_channel.0,
-            location: Default::default(),
+            settings: Settings::default(),
             location_name: "".into(),
             found_locations: None,
-            icon_theme: IconTheme::Monochrome,
-            autorun_enabled: false,
             screen: SettingsScreen::Home,
         }
     }
@@ -49,9 +45,7 @@ impl SettingsWindow {
     pub fn new(tx: Sender<Option<Settings>>, settings: &Settings) -> Self {
         SettingsWindow {
             tx_window: Some(tx),
-            location: settings.location.clone(),
-            icon_theme: settings.icon_theme.clone(),
-            autorun_enabled: settings.autorun_enabled,
+            settings: settings.clone(),
             screen: SettingsScreen::Home,
             ..Default::default()
         }
@@ -72,8 +66,8 @@ impl SettingsWindow {
         ui.heading(t!("settings_heading"));
 
         setting_entry(ui, t!("location"), |ui| {
-            let text = if self.location.id != 0 {
-                self.location.to_human_readable()
+            let text = if self.settings.location.id != 0 {
+                self.settings.location.to_human_readable()
             } else {
                 t!("empty_location").into()
             };
@@ -82,19 +76,23 @@ impl SettingsWindow {
             }
         });
 
+        setting_entry(ui, t!("refresh_each"), |ui| {
+            integer_edit_field(ui, &mut self.settings.update_interval)
+        });
+
         setting_entry(ui, t!("icon_theme"), |ui| {
             ComboBox::from_id_source("icon_theme")
-                .selected_text(&self.icon_theme.to_string())
+                .selected_text(&self.settings.icon_theme.to_string())
                 .show_ui(ui, |ui| {
                     IconTheme::iterator().cloned().for_each(|icon_theme| {
                         let text = icon_theme.to_string();
-                        ui.selectable_value(&mut self.icon_theme, icon_theme, text);
+                        ui.selectable_value(&mut self.settings.icon_theme, icon_theme, text);
                     });
                 });
         });
 
         setting_entry(ui, t!("autostart", name = PROGRAM_NAME), |ui| {
-            ui.add(Checkbox::without_text(&mut self.autorun_enabled));
+            ui.add(Checkbox::without_text(&mut self.settings.autorun_enabled));
         });
 
         ui.horizontal(|ui| {
@@ -105,12 +103,7 @@ impl SettingsWindow {
 
                 if save_button.clicked() {
                     if let Some(tx) = &self.tx_window {
-                        let settings = Settings {
-                            location: self.location.clone(),
-                            icon_theme: self.icon_theme.clone(),
-                            autorun_enabled: self.autorun_enabled,
-                        };
-                        tx.send(Some(settings)).unwrap();
+                        tx.send(Some(self.settings.clone())).unwrap();
                     }
                     self.close_window(ctx);
                 } else if cancel_button.clicked() {
@@ -158,7 +151,7 @@ impl SettingsWindow {
                 ui.vertical(|ui| {
                     for location in locations {
                         if ui.button(location.to_human_readable()).clicked() {
-                            self.location = location.clone();
+                            self.settings.location = location.clone();
                             self.screen = SettingsScreen::Home;
                         }
                     }
@@ -212,12 +205,21 @@ fn setting_entry<R>(
         });
 }
 
+fn integer_edit_field(ui: &mut egui::Ui, value: &mut u64) -> egui::Response {
+    let mut tmp_value = format!("{}", value);
+    let res = ui.text_edit_singleline(&mut tmp_value);
+    if let Ok(result) = tmp_value.parse() {
+        *value = result;
+    }
+    res
+}
+
 pub(crate) fn show_settings_window(settings: &Settings) -> Option<Settings> {
     let (tx, rx) = channel::<Option<Settings>>();
     let settings_window = SettingsWindow::new(tx.clone(), settings);
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([480.0, 320.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([480.0, 400.0]),
         ..Default::default()
     };
     eframe::run_native(

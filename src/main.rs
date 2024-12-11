@@ -6,7 +6,10 @@ mod gui;
 mod settings;
 mod weather;
 
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use app::{TaskGuard, WeatherApp};
 use async_winit::{event_loop::EventLoop, ThreadUnsafe};
@@ -21,8 +24,6 @@ use tray_icon::{
 };
 
 pub const PROGRAM_NAME: &str = "Tray Weather";
-
-const UPDATE_INTERVAL: u64 = 60 * 15;
 
 rust_i18n::i18n!("locales");
 
@@ -68,6 +69,8 @@ async fn main() -> Result<()> {
         settings.save()?;
     }
 
+    let update_interval = Arc::new(Mutex::new(settings.update_interval));
+
     // show_forecast_window(&settings).unwrap();
     // return Ok(());
 
@@ -84,6 +87,8 @@ async fn main() -> Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
     let mut task_guard = TaskGuard::new();
 
+    let sleep_update_interval = update_interval.clone();
+
     // Ticker for update interval
     let timer_tx = tx.clone();
     task_guard.spawn(|notify| {
@@ -94,7 +99,7 @@ async fn main() -> Result<()> {
                         trace!("Timer task notified. Exiting...");
                         break;
                     }
-                    _ = tokio::time::sleep(Duration::from_secs(UPDATE_INTERVAL)) => {
+                    _ = tokio::time::sleep(Duration::from_secs(*sleep_update_interval.lock().unwrap() * 60)) => {
                         trace!("Timer task sleeped. Ticking...");
                         let _ = timer_tx.send(Message::Update).await;
                     }
@@ -144,6 +149,8 @@ async fn main() -> Result<()> {
     // Initial weather update
     app.update_weather().await?;
 
+    let setting_update_interval = update_interval.clone();
+
     // Run main event loop
     event_loop.block_on(async move {
         loop {
@@ -155,6 +162,7 @@ async fn main() -> Result<()> {
                         if let Some(new_settings) = show_settings_window(&app.settings) {
                             app.settings.update(&new_settings);
                             app.settings.save().expect("Could not save settings.");
+                            *setting_update_interval.lock().unwrap() = app.settings.update_interval;
                             app.update_settings().await.unwrap();
                         }
                     }

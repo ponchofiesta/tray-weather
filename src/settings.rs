@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Settings {
     pub location: Location,
+    pub update_interval: u64,
     pub icon_theme: IconTheme,
     #[serde(default)]
     pub autorun_enabled: bool,
@@ -16,6 +17,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             location: Default::default(),
+            update_interval: 15,
             icon_theme: IconTheme::Metno,
             autorun_enabled: false,
         }
