@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::{gui::IconTheme, weather::Location, Result};
+use crate::{weather::Location, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct Settings {
     pub location: Location,
     pub update_interval: u64,
-    pub icon_theme: IconTheme,
+    // pub icon_theme: IconTheme,
     #[serde(default)]
     pub autorun_enabled: bool,
 }
@@ -18,7 +18,7 @@ impl Default for Settings {
         Self {
             location: Default::default(),
             update_interval: 15,
-            icon_theme: IconTheme::Metno,
+            // icon_theme: IconTheme::Metno,
             autorun_enabled: false,
         }
     }

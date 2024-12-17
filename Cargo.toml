@@ -23,8 +23,9 @@ toml = "0.8.19"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
 log = "0.4.22"
 env_logger = { version = "0.11.5", default-features = false }
-eframe = { version = "0.28.1" }
-egui-wgpu = "0.28.1"
+# eframe = { version = "0.28.1" }
+# egui-wgpu = "0.28.1"
+vizia = { git = "https://github.com/vizia/vizia", rev = "17f6199" }
 directories = "5.0.1"
 auto-launch = "0.5.0"
 rust-i18n = "3.1.2"
